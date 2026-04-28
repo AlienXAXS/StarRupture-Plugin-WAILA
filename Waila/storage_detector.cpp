@@ -40,18 +40,24 @@ namespace Waila
 		// Probe for CrBuildingMainStorageComponent
 		UCrBuildingMainStorageComponent* mainStorage = static_cast<UCrBuildingMainStorageComponent*>(
 			building->GetComponentByClass(UCrBuildingMainStorageComponent::StaticClass()));
+
 		if (mainStorage)
 		{
-			LOG_DEBUG("[StorageDetector] CrBuildingMainStorageComponent FOUND on %s", actor->GetName().c_str());
-
 			UCrBuildingItemStorageComponent* itemStorage = static_cast<UCrBuildingItemStorageComponent*>(mainStorage);
 			if (itemStorage)
-				LOG_DEBUG("[StorageDetector] Cast to UCrBuildingItemStorageComponent SUCCEEDED on %s", actor->GetName().c_str());
-			else
-				LOG_DEBUG("[StorageDetector] Cast to UCrBuildingItemStorageComponent FAILED on %s", actor->GetName().c_str());
+			{
+				/*
+				  GetStoredItemsContainerInternal:
+					struct FCrItemsStorageContainer *__fastcall UCrBuildingItemStorageComponent::GetStoredItemsContainerInternal(
+						UCrBuildingItemStorageComponent *this,
+						const struct UWorld *a2)
+
+					40 53 48 83 EC ?? 48 8B 81 ?? ?? ?? ?? 48 8B D9 48 85 C0 75 ?? E8 ?? ?? ?? ?? 48 8B C8
+
+				  Once the function has been found, we can call it to get the items that the container has, then display how many of that item exist.
+				*/
+			}
 		}
-		else
-			LOG_DEBUG("[StorageDetector] CrBuildingMainStorageComponent NOT FOUND on %s", actor->GetName().c_str());
 
 		// Capacity from the main storage component
 		if (building->ItemStorage)
