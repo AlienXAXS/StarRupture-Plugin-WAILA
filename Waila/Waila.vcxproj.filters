@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Plugin">
+      <UniqueIdentifier>{A5B0B8F1-2D4E-4F6A-8C3D-1E5F7B2A9C4D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core">
+      <UniqueIdentifier>{B7C1D3E5-4F8A-6B9D-2E5F-8C3D1A7E9F2B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Handlers">
+      <UniqueIdentifier>{C8D2E4F6-5G9B-7C0E-3F6G-9D4E2B8F0G3C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UI">
+      <UniqueIdentifier>{D9E3F5G7-6H0C-8D1F-4G7H-0E5F3C9G1H4D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Config">
+      <UniqueIdentifier>{E0F4G6H8-7I1D-9E2G-5H8I-1F6G4D0H2I5E}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\include\plugin_interface.h">
+      <Filter>Plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="plugin.h">
+      <Filter>Plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="plugin_config.h">
+      <Filter>Plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="plugin_helpers.h">
+      <Filter>Plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\raycaster.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="crafter_detector.h">
+      <Filter>Handlers</Filter>
+    </ClInclude>
+    <ClInclude Include="storage_detector.h">
+      <Filter>Handlers</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\ui_manager.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="dllmain.cpp">
+      <Filter>Plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="plugin.cpp">
+      <Filter>Plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="plugin_config.cpp">
+      <Filter>Plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="$(StarRuptureSDKSourceDir)Basic.cpp">
+      <Filter>Plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="$(StarRuptureSDKSourceDir)CoreUObject_functions.cpp">
+      <Filter>Plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="$(StarRuptureSDKSourceDir)Engine_functions.cpp">
+      <Filter>Plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="$(StarRuptureSDKSourceDir)Chimera_functions.cpp">
+      <Filter>Plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="$(StarRuptureSDKSourceDir)AuCrafting_functions.cpp">
+      <Filter>Plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="$(StarRuptureSDKSourceDir)AuItems_functions.cpp">
+      <Filter>Plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\raycaster.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="crafter_detector.cpp">
+      <Filter>Handlers</Filter>
+    </ClCompile>
+    <ClCompile Include="storage_detector.cpp">
+      <Filter>Handlers</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\ui_manager.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>
