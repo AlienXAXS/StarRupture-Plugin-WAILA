@@ -1,12 +1,6 @@
 name: Build and Release
 
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - '**/*.md'
-      - '.github/**'
   workflow_dispatch:
 
 jobs:
@@ -196,7 +190,7 @@ jobs:
         run: |
           $tag     = "${{ steps.tag.outputs.TAG }}"
           $ws      = $env:GITHUB_WORKSPACE
-          $name    = "BetterDrone"
+          $name    = "WAILA"
           $variant = "Client"
           $varLow  = "client"
 
@@ -210,5 +204,5 @@ jobs:
           $assets | ForEach-Object { Write-Host "  $_" }
 
           gh release create $tag @assets `
-            --title "BetterDrone Plugin $tag" `
+            --title "WAILA Plugin $tag" `
             --generate-notes
