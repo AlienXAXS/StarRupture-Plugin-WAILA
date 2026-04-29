@@ -1,5 +1,6 @@
 #include "ui_manager.h"
 #include "plugin_helpers.h"
+#include "plugin_config.h"
 #include "Engine_classes.hpp"
 #include "Engine_structs.hpp"
 #include <cstdio>
@@ -149,6 +150,8 @@ namespace Waila::UI
 		Waila::PowerInfo    powerInfo;
 		Waila::CoolerActiveInfo  coolerActiveInfo;
 		Waila::CoolerPassiveInfo coolerPassiveInfo;
+		Waila::CargoSenderInfo   cargoSenderInfo;
+		Waila::CargoReceiverInfo cargoReceiverInfo;
 
 		// Perform raycast and extract info immediately (while actor pointer is valid)
 		// PerformRaycast always fills hit.rayStart/rayEnd even on a miss, so we can visualise both cases.
@@ -175,6 +178,14 @@ namespace Waila::UI
 			{
 				Waila::CoolerPassiveDetector::GetCoolerPassiveInfo(hit.actor, coolerPassiveInfo);
 			}
+			else if (Waila::CargoSenderDetector::IsSender(hit.actor))
+			{
+				Waila::CargoSenderDetector::GetSenderInfo(hit.actor, cargoSenderInfo);
+			}
+			else if (Waila::CargoReceiverDetector::IsReceiver(hit.actor))
+			{
+				Waila::CargoReceiverDetector::GetReceiverInfo(hit.actor, cargoReceiverInfo);
+			}
 		}
 
 		// Store the extracted info and debug ray under lock for the render thread
@@ -185,13 +196,15 @@ namespace Waila::UI
 			m_pendingPowerInfo   = powerInfo;
 			m_pendingCoolerActiveInfo  = coolerActiveInfo;
 			m_pendingCoolerPassiveInfo = coolerPassiveInfo;
+			m_pendingCargoSenderInfo   = cargoSenderInfo;
+			m_pendingCargoReceiverInfo = cargoReceiverInfo;
 			m_debugRay.start     = hit.rayStart;
 			m_debugRay.end       = hit.rayEnd;
 			m_debugRay.hit       = bHit;
 			m_debugRay.valid     = true;
 		}
 
-		bool shouldBeVisible = info.IsValid() || storageInfo.IsValid() || powerInfo.IsValid() || coolerActiveInfo.IsValid() || coolerPassiveInfo.IsValid();
+		bool shouldBeVisible = info.IsValid() || storageInfo.IsValid() || powerInfo.IsValid() || coolerActiveInfo.IsValid() || coolerPassiveInfo.IsValid() || cargoSenderInfo.IsValid() || cargoReceiverInfo.IsValid();
 
 		if (m_self->hooks && m_self->hooks->UI && m_widgetHandle)
 		{
@@ -209,6 +222,12 @@ namespace Waila::UI
 
 	static void RenderWrappedDesc(IModLoaderImGui* imgui, const std::string& desc, int maxLineLen = 30)
 	{
+		auto shouldRenderDesc = WailaPluginConfig::Config::ShouldRenderDescriptions();
+		if (!shouldRenderDesc)
+		{
+			return;
+		}
+
 		static const char* prefix = "Desc:     ";
 		static const char* indent = "          ";
 
@@ -261,6 +280,8 @@ namespace Waila::UI
 			Waila::PowerInfo    renderPowerInfo;
 			Waila::CoolerActiveInfo  renderCoolerActiveInfo;
 			Waila::CoolerPassiveInfo renderCoolerPassiveInfo;
+			Waila::CargoSenderInfo   renderCargoSenderInfo;
+			Waila::CargoReceiverInfo renderCargoReceiverInfo;
 			{
 				std::lock_guard<std::mutex> lock(m_infoMutex);
 				renderInfo               = m_pendingInfo;
@@ -268,15 +289,17 @@ namespace Waila::UI
 				renderPowerInfo          = m_pendingPowerInfo;
 				renderCoolerActiveInfo   = m_pendingCoolerActiveInfo;
 				renderCoolerPassiveInfo  = m_pendingCoolerPassiveInfo;
+				renderCargoSenderInfo    = m_pendingCargoSenderInfo;
+				renderCargoReceiverInfo  = m_pendingCargoReceiverInfo;
 			}
 
 			// Don't render if disabled (world ended) or no valid data
-			if (!m_self || (!renderInfo.IsValid() && !renderStorageInfo.IsValid() && !renderPowerInfo.IsValid() && !renderCoolerActiveInfo.IsValid() && !renderCoolerPassiveInfo.IsValid()))
+			if (!m_self || (!renderInfo.IsValid() && !renderStorageInfo.IsValid() && !renderPowerInfo.IsValid() && !renderCoolerActiveInfo.IsValid() && !renderCoolerPassiveInfo.IsValid() && !renderCargoSenderInfo.IsValid() && !renderCargoReceiverInfo.IsValid()))
 			{
 				return;
 			}
 
-			imgui->TextColored(0.2f, 1.0f, 0.2f, 1.0f, "What Am I Looking At");
+			imgui->TextColored(0.2f, 1.0f, 0.2f, 1.0f, "What Am I Looking At?");
 			imgui->Separator();
 
 			char buf[512];
@@ -291,6 +314,10 @@ namespace Waila::UI
 				RenderCoolerActiveInfo(imgui, renderCoolerActiveInfo);
 			else if (renderCoolerPassiveInfo.IsValid())
 				RenderCoolerPassiveInfo(imgui, renderCoolerPassiveInfo);
+			else if (renderCargoSenderInfo.IsValid())
+				RenderCargoSenderInfo(imgui, renderCargoSenderInfo);
+			else if (renderCargoReceiverInfo.IsValid())
+				RenderCargoReceiverInfo(imgui, renderCargoReceiverInfo);
 		}
 		catch (const std::exception& e)
 		{
@@ -477,5 +504,68 @@ namespace Waila::UI
 	void WailaUIManager::RenderCoolerPassiveInfo(IModLoaderImGui* imgui, const Waila::CoolerPassiveInfo& info)
 	{
 		RenderCoolerShared(imgui, info.buildingName, info.buildingDesc, info.state, info.connectedSockets, info.totalSockets);
+	}
+
+	void WailaUIManager::RenderCargoSenderInfo(IModLoaderImGui* imgui, const Waila::CargoSenderInfo& info)
+	{
+		char buf[512];
+
+		memset(buf, 0, sizeof(buf));
+		snprintf(buf, sizeof(buf) - 1, "Name:     %s", info.buildingName.c_str());
+		buf[sizeof(buf) - 1] = '\0';
+		imgui->Text(buf);
+
+		if (!info.buildingDesc.empty())
+			RenderWrappedDesc(imgui, info.buildingDesc);
+
+		imgui->Separator();
+
+		imgui->Text(info.canSend ? "Status:   Loading Drone / Idle" : "Status:   Sending...");
+
+		memset(buf, 0, sizeof(buf));
+		float progress = info.sendProgress;
+
+		if (progress < 0.0f)
+			progress = 0.0f;
+
+		progress *= 100.0f;
+		snprintf(buf, sizeof(buf), "Progress: %.0f%%", progress);
+		imgui->Text(buf);
+
+		if (!info.sendingItemName.empty())
+		{
+			memset(buf, 0, sizeof(buf));
+			snprintf(buf, sizeof(buf) - 1, "Sending:  %s", info.sendingItemName.c_str());
+			buf[sizeof(buf) - 1] = '\0';
+			imgui->Text(buf);
+		}
+	}
+
+	void WailaUIManager::RenderCargoReceiverInfo(IModLoaderImGui* imgui, const Waila::CargoReceiverInfo& info)
+	{
+		char buf[512];
+
+		memset(buf, 0, sizeof(buf));
+		snprintf(buf, sizeof(buf) - 1, "Name:     %s", info.buildingName.c_str());
+		buf[sizeof(buf) - 1] = '\0';
+		imgui->Text(buf);
+
+		if (!info.buildingDesc.empty())
+			RenderWrappedDesc(imgui, info.buildingDesc);
+
+		imgui->Separator();
+
+		memset(buf, 0, sizeof(buf));
+		snprintf(buf, sizeof(buf) - 1, "Capacity: %d slots", info.maxCapacity);
+		buf[sizeof(buf) - 1] = '\0';
+		imgui->Text(buf);
+
+		for (const auto& item : info.storedItems)
+		{
+			memset(buf, 0, sizeof(buf));
+			snprintf(buf, sizeof(buf) - 1, "Storing %dx %s", item.count, item.displayName.c_str());
+			buf[sizeof(buf) - 1] = '\0';
+			imgui->Text(buf);
+		}
 	}
 }

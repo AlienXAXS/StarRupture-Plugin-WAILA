@@ -121,7 +121,7 @@ extern "C" {
 					LOG_DEBUG("PluginInit: registering OnAnyWorldBeginPlay");
 					self->hooks->World->RegisterOnAnyWorldBeginPlay(&OnWorldBeginPlay);
 					LOG_DEBUG("PluginInit: registering OnAfterWorldEndPlay");
-					self->hooks->World->RegisterOnAfterWorldEndPlay(&OnWorldEndPlay);
+					self->hooks->World->RegisterOnBeforeWorldEndPlay(&OnWorldEndPlay);
 					LOG_DEBUG("PluginInit: world callbacks registered");
 
 					// Hot-reload: if ChimeraMain is already active, activate now

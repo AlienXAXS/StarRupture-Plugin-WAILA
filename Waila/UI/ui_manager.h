@@ -7,6 +7,8 @@
 #include "power_detector.h"
 #include "cooler_active_detector.h"
 #include "cooler_passive_detector.h"
+#include "cargo_sender_detector.h"
+#include "cargo_receiver_detector.h"
 #include "Engine_structs.hpp"
 #include <atomic>
 #include <mutex>
@@ -36,6 +38,8 @@ namespace Waila::UI
 		void RenderPowerInfo(IModLoaderImGui* imgui, const Waila::PowerInfo& info);
 		void RenderCoolerActiveInfo(IModLoaderImGui* imgui, const Waila::CoolerActiveInfo& info);
 		void RenderCoolerPassiveInfo(IModLoaderImGui* imgui, const Waila::CoolerPassiveInfo& info);
+		void RenderCargoSenderInfo(IModLoaderImGui* imgui, const Waila::CargoSenderInfo& info);
+		void RenderCargoReceiverInfo(IModLoaderImGui* imgui, const Waila::CargoReceiverInfo& info);
 
 		// Static C-linkage callbacks for plugin API registration
 		static void OnTick(float deltaSeconds);
@@ -57,6 +61,8 @@ namespace Waila::UI
 		Waila::PowerInfo    m_pendingPowerInfo;
 		Waila::CoolerActiveInfo  m_pendingCoolerActiveInfo;
 		Waila::CoolerPassiveInfo m_pendingCoolerPassiveInfo;
+		Waila::CargoSenderInfo   m_pendingCargoSenderInfo;
+		Waila::CargoReceiverInfo m_pendingCargoReceiverInfo;
 
 		// Last ray data for HUD debug visualisation — written by Tick, read by OnHUDPostRender
 		struct DebugRay

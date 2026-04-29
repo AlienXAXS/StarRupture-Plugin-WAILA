@@ -306,6 +306,8 @@
     <ClInclude Include="power_detector.h" />
     <ClInclude Include="cooler_active_detector.h" />
     <ClInclude Include="cooler_passive_detector.h" />
+    <ClInclude Include="cargo_sender_detector.h" />
+    <ClInclude Include="cargo_receiver_detector.h" />
     <ClInclude Include="UI\ui_manager.h" />
   </ItemGroup>
   <ItemGroup>
@@ -325,6 +327,8 @@
     <ClCompile Include="power_detector.cpp" />
     <ClCompile Include="cooler_active_detector.cpp" />
     <ClCompile Include="cooler_passive_detector.cpp" />
+    <ClCompile Include="cargo_sender_detector.cpp" />
+    <ClCompile Include="cargo_receiver_detector.cpp" />
     <ClCompile Include="UI\ui_manager.cpp" />
     <ClCompile Include="waila_functions.cpp" />
   </ItemGroup>

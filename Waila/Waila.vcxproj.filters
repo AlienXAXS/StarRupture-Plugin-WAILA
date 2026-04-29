@@ -51,6 +51,12 @@
     <ClInclude Include="cooler_passive_detector.h">
       <Filter>Handlers</Filter>
     </ClInclude>
+    <ClInclude Include="cargo_receiver_detector.h">
+      <Filter>Handlers</Filter>
+    </ClInclude>
+    <ClInclude Include="cargo_sender_detector.h">
+      <Filter>Handlers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -103,6 +109,13 @@
     </ClCompile>
     <ClCompile Include="waila_functions.cpp">
       <Filter>Plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="$(StarRuptureSDKSourceDir)AuActorPlacement_functions.cpp" />
+    <ClCompile Include="cargo_receiver_detector.cpp">
+      <Filter>Handlers</Filter>
+    </ClCompile>
+    <ClCompile Include="cargo_sender_detector.cpp">
+      <Filter>Handlers</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

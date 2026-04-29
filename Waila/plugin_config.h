@@ -14,14 +14,21 @@ namespace WailaPluginConfig
 			"Enable or disable the WAILA plugin"
 		},
 		{
-			"Raycasting",
-			"MaxDistance",
+			"WAILA",
+			"Max Distance",
 			ConfigValueType::Float,
 			"650.0",
 			"Maximum distance for WAILA raycast (units)",
 			0.0f,
 			2500.0f
 		},
+		{
+			"WAILA",
+			"Render Building Descriptions",
+			ConfigValueType::Boolean,
+			"true",
+			"Whether to render building descriptions in the WAILA widget"
+		}
 	};
 
 	static const ConfigSchema SCHEMA = {
@@ -52,7 +59,12 @@ namespace WailaPluginConfig
 
 		static float GetMaxDistance()
 		{
-			return s_self ? s_self->config->ReadFloat(s_self, "Raycasting", "MaxDistance", 650.0f) : 650.0f;
+			return s_self ? s_self->config->ReadFloat(s_self, "WAILA", "Max Distance", 650.0f) : 650.0f;
+		}
+
+		static bool ShouldRenderDescriptions()
+		{
+			return s_self ? s_self->config->ReadBool(s_self, "WAILA", "Render Building Descriptions", true) : true;
 		}
 
 	private:
