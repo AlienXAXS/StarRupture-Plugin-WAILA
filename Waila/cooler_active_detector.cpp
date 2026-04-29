@@ -12,6 +12,9 @@ namespace Waila
 {
 	bool CoolerActiveDetector::IsCoolerActive(AActor* actor)
 	{
+		// Disable cooler detection for now, it doesnt work as expected.
+		return false;
+
 		if (!actor || !UKismetSystemLibrary::IsValid(actor))
 			return false;
 
