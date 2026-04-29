@@ -1,6 +1,7 @@
 #include "plugin.h"
 #include "plugin_helpers.h"
 #include "plugin_config.h"
+#include "waila_functions.h"
 #include "UI/ui_manager.h"
 #include "Engine_classes.hpp"
 #include <cstring>
@@ -18,6 +19,7 @@ static bool g_isActive = false;
 
 static void OnWorldBeginPlay(SDK::UWorld* world, const char* worldName)
 {
+	LOG_DEBUG("OnWorldBeginPlay: world=%p name=%s", world, worldName ? worldName : "(null)");
 	if (worldName && strcmp(worldName, "ChimeraMain") == 0)
 	{
 		LOG_INFO("ChimeraMain loaded — activating WAILA");
@@ -35,6 +37,7 @@ static void OnWorldBeginPlay(SDK::UWorld* world, const char* worldName)
 
 static void OnWorldEndPlay(SDK::UWorld* world, const char* worldName)
 {
+	LOG_DEBUG("OnWorldEndPlay: world=%p name=%s g_isActive=%d", world, worldName ? worldName : "(null)", (int)g_isActive);
 	if (g_isActive)
 	{
 		LOG_INFO("World ending — deactivating WAILA");
@@ -42,6 +45,7 @@ static void OnWorldEndPlay(SDK::UWorld* world, const char* worldName)
 		g_isActive = false;
 		LOG_DEBUG("OnWorldEndPlay: WAILA deactivated");
 	}
+	LOG_DEBUG("OnWorldEndPlay: done");
 }
 
 // Plugin metadata
@@ -71,6 +75,8 @@ extern "C" {
 			g_self = self;
 
 			LOG_INFO("Plugin initializing...");
+
+			Waila::Functions::Init();
 			LOG_DEBUG("PluginInit: self = %p", self);
 			LOG_DEBUG("PluginInit: hooks = %p", self ? self->hooks : nullptr);
 			LOG_DEBUG("PluginInit: logger = %p", self ? self->logger : nullptr);
@@ -93,10 +99,8 @@ extern "C" {
 
 			// Log config values
 			float maxDist = WailaPluginConfig::Config::GetMaxDistance();
-			float opacity = WailaPluginConfig::Config::GetWindowOpacity();
 			LOG_INFO("WAILA Configuration:");
 			LOG_INFO("  MaxDistance: %.1f units", maxDist);
-			LOG_INFO("  WindowOpacity: %.2f", opacity);
 
 			// Create UI manager
 			LOG_DEBUG("PluginInit: allocating WailaUIManager");

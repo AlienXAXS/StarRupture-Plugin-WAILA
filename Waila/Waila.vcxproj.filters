@@ -42,6 +42,15 @@
     <ClInclude Include="UI\ui_manager.h">
       <Filter>UI</Filter>
     </ClInclude>
+    <ClInclude Include="power_detector.h">
+      <Filter>Handlers</Filter>
+    </ClInclude>
+    <ClInclude Include="cooler_active_detector.h">
+      <Filter>Handlers</Filter>
+    </ClInclude>
+    <ClInclude Include="cooler_passive_detector.h">
+      <Filter>Handlers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -82,6 +91,18 @@
     </ClCompile>
     <ClCompile Include="UI\ui_manager.cpp">
       <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="power_detector.cpp">
+      <Filter>Handlers</Filter>
+    </ClCompile>
+    <ClCompile Include="cooler_active_detector.cpp">
+      <Filter>Handlers</Filter>
+    </ClCompile>
+    <ClCompile Include="cooler_passive_detector.cpp">
+      <Filter>Handlers</Filter>
+    </ClCompile>
+    <ClCompile Include="waila_functions.cpp">
+      <Filter>Plugin</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

@@ -1,6 +1,8 @@
 #include "crafter_detector.h"
+#include "waila_functions.h"
 #include "plugin_helpers.h"
 #include "Chimera_classes.hpp"
+#include "Chimera_structs.hpp"
 #include "AuCrafting_classes.hpp"
 #include "AuItems_classes.hpp"
 
@@ -53,6 +55,7 @@ namespace Waila
 		outInfo.currentRecipe = "(idle)";
 
 		UCrCraftingComponent* comp = crafter->CraftComponent;
+
 		if (comp)
 		{
 			const TArray<FAuCraftItem>& items = comp->ItemsToCraft;
@@ -66,6 +69,20 @@ namespace Waila
 				{
 					outInfo.currentRecipe = itemData->UniqueItemName.ToString();
 					outInfo.currentRecipeDisplayName = SDK::UKismetTextLibrary::Conv_TextToString(itemData->ItemName).ToString();
+				}
+			}
+
+			// pattern: UCrCraftingComponent::GetCraftingFragment
+			// 48 89 5C 24 ?? 57 48 83 EC ?? 48 8B 99 ...
+			auto fnGetFrag = Waila::Functions::GetCraftingFragment();
+			if (fnGetFrag)
+			{
+				const FCrCraftingFragment* frag = fnGetFrag(comp);
+				if (frag)
+				{
+					outInfo.craftingMultiplier = frag->CraftingMultiplier;
+					outInfo.bMissingItems      = frag->bIsMissingItems;
+					outInfo.bOutputFull        = frag->bOutputFull;
 				}
 			}
 		}

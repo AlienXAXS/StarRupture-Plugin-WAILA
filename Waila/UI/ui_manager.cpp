@@ -137,7 +137,7 @@ namespace Waila::UI
 
 	void WailaUIManager::Tick(float deltaSeconds)
 	{
-
+		LOG_TRACE("WailaUIManager::Tick");
 		if (!m_self)
 		{
 			return;
@@ -146,6 +146,9 @@ namespace Waila::UI
 		Waila::Core::RaycastHit hit;
 		Waila::CrafterInfo  info;
 		Waila::StorageInfo  storageInfo;
+		Waila::PowerInfo    powerInfo;
+		Waila::CoolerActiveInfo  coolerActiveInfo;
+		Waila::CoolerPassiveInfo coolerPassiveInfo;
 
 		// Perform raycast and extract info immediately (while actor pointer is valid)
 		// PerformRaycast always fills hit.rayStart/rayEnd even on a miss, so we can visualise both cases.
@@ -160,6 +163,18 @@ namespace Waila::UI
 			{
 				Waila::StorageDetector::GetStorageInfo(hit.actor, storageInfo);
 			}
+			else if (Waila::PowerDetector::IsGenerator(hit.actor))
+			{
+				Waila::PowerDetector::GetPowerInfo(hit.actor, powerInfo);
+			}
+			else if (Waila::CoolerActiveDetector::IsCoolerActive(hit.actor))
+			{
+				Waila::CoolerActiveDetector::GetCoolerActiveInfo(hit.actor, coolerActiveInfo);
+			}
+			else if (Waila::CoolerPassiveDetector::IsCoolerPassive(hit.actor))
+			{
+				Waila::CoolerPassiveDetector::GetCoolerPassiveInfo(hit.actor, coolerPassiveInfo);
+			}
 		}
 
 		// Store the extracted info and debug ray under lock for the render thread
@@ -167,13 +182,16 @@ namespace Waila::UI
 			std::lock_guard<std::mutex> lock(m_infoMutex);
 			m_pendingInfo        = info;
 			m_pendingStorageInfo = storageInfo;
+			m_pendingPowerInfo   = powerInfo;
+			m_pendingCoolerActiveInfo  = coolerActiveInfo;
+			m_pendingCoolerPassiveInfo = coolerPassiveInfo;
 			m_debugRay.start     = hit.rayStart;
 			m_debugRay.end       = hit.rayEnd;
 			m_debugRay.hit       = bHit;
 			m_debugRay.valid     = true;
 		}
 
-		bool shouldBeVisible = info.IsValid() || storageInfo.IsValid();
+		bool shouldBeVisible = info.IsValid() || storageInfo.IsValid() || powerInfo.IsValid() || coolerActiveInfo.IsValid() || coolerPassiveInfo.IsValid();
 
 		if (m_self->hooks && m_self->hooks->UI && m_widgetHandle)
 		{
@@ -237,17 +255,23 @@ namespace Waila::UI
 				return;
 			}
 
-			// Take a snapshot of pending info for both detector types
+			// Take a snapshot of pending info for all detector types
 			Waila::CrafterInfo  renderInfo;
 			Waila::StorageInfo  renderStorageInfo;
+			Waila::PowerInfo    renderPowerInfo;
+			Waila::CoolerActiveInfo  renderCoolerActiveInfo;
+			Waila::CoolerPassiveInfo renderCoolerPassiveInfo;
 			{
 				std::lock_guard<std::mutex> lock(m_infoMutex);
-				renderInfo        = m_pendingInfo;
-				renderStorageInfo = m_pendingStorageInfo;
+				renderInfo               = m_pendingInfo;
+				renderStorageInfo        = m_pendingStorageInfo;
+				renderPowerInfo          = m_pendingPowerInfo;
+				renderCoolerActiveInfo   = m_pendingCoolerActiveInfo;
+				renderCoolerPassiveInfo  = m_pendingCoolerPassiveInfo;
 			}
 
 			// Don't render if disabled (world ended) or no valid data
-			if (!m_self || (!renderInfo.IsValid() && !renderStorageInfo.IsValid()))
+			if (!m_self || (!renderInfo.IsValid() && !renderStorageInfo.IsValid() && !renderPowerInfo.IsValid() && !renderCoolerActiveInfo.IsValid() && !renderCoolerPassiveInfo.IsValid()))
 			{
 				return;
 			}
@@ -258,73 +282,15 @@ namespace Waila::UI
 			char buf[512];
 
 			if (renderInfo.IsValid())
-			{
-				memset(buf, 0, sizeof(buf));
-				snprintf(buf, sizeof(buf) - 1, "Name:     %s", renderInfo.crafterClass.empty() ? "N/A" : renderInfo.crafterClass.c_str());
-				buf[sizeof(buf) - 1] = '\0';
-				imgui->Text(buf);
-
-				if (renderInfo.buildingDesc.empty())
-					imgui->Text("Desc:     N/A");
-				else
-					RenderWrappedDesc(imgui, renderInfo.buildingDesc);
-
-				memset(buf, 0, sizeof(buf));
-				snprintf(buf, sizeof(buf) - 1, "Speed:    %.2fx", renderInfo.craftingSpeed);
-				buf[sizeof(buf) - 1] = '\0';
-				imgui->Text(buf);
-
-				imgui->Separator();
-
-				memset(buf, 0, sizeof(buf));
-				snprintf(buf, sizeof(buf) - 1, "Crafting: %s", renderInfo.currentRecipeDisplayName.empty() ? renderInfo.currentRecipe.c_str() : renderInfo.currentRecipeDisplayName.c_str());
-				buf[sizeof(buf) - 1] = '\0';
-				imgui->Text(buf);
-
-				if (renderInfo.recipeBuildTime > 0.f)
-				{
-					float ipm = (60.f / renderInfo.recipeBuildTime) * renderInfo.recipeOutputCount;
-					char ipmBuf[32];
-					if (ipm == floorf(ipm))
-						snprintf(ipmBuf, sizeof(ipmBuf), "%d/pm", static_cast<int>(ipm));
-					else
-						snprintf(ipmBuf, sizeof(ipmBuf), "%.1f/pm", ipm);
-
-					float bt = renderInfo.recipeBuildTime;
-					char timeBuf[16];
-					if (bt == floorf(bt))
-						snprintf(timeBuf, sizeof(timeBuf), "%ds", static_cast<int>(bt));
-					else
-						snprintf(timeBuf, sizeof(timeBuf), "%.1fs", bt);
-
-					memset(buf, 0, sizeof(buf));
-					snprintf(buf, sizeof(buf) - 1, "Interval: %s (%s)", timeBuf, ipmBuf);
-					buf[sizeof(buf) - 1] = '\0';
-					imgui->Text(buf);
-				}
-
-				memset(buf, 0, sizeof(buf));
-				snprintf(buf, sizeof(buf) - 1, "Progress: %.1f%%", renderInfo.craftingProgress * 100.f);
-				buf[sizeof(buf) - 1] = '\0';
-				imgui->Text(buf);
-			}
+				RenderCrafterInfo(imgui, renderInfo);
 			else if (renderStorageInfo.IsValid())
-			{
-				memset(buf, 0, sizeof(buf));
-				snprintf(buf, sizeof(buf) - 1, "Name:     %s", renderStorageInfo.buildingName.c_str());
-				buf[sizeof(buf) - 1] = '\0';
-				imgui->Text(buf);
-
-				if (!renderStorageInfo.buildingDesc.empty())
-					RenderWrappedDesc(imgui, renderStorageInfo.buildingDesc);
-
-				imgui->Separator();
-
-				memset(buf, 0, sizeof(buf));
-				snprintf(buf, sizeof(buf) - 1, "Capacity: %d slots", renderStorageInfo.maxCapacity);
-				buf[sizeof(buf) - 1] = '\0';
-				imgui->Text(buf);
-			}
+				RenderStorageInfo(imgui, renderStorageInfo);
+			else if (renderPowerInfo.IsValid())
+				RenderPowerInfo(imgui, renderPowerInfo);
+			else if (renderCoolerActiveInfo.IsValid())
+				RenderCoolerActiveInfo(imgui, renderCoolerActiveInfo);
+			else if (renderCoolerPassiveInfo.IsValid())
+				RenderCoolerPassiveInfo(imgui, renderCoolerPassiveInfo);
 		}
 		catch (const std::exception& e)
 		{
@@ -333,6 +299,183 @@ namespace Waila::UI
 		catch (...)
 		{
 			LOG_ERROR("WailaUIManager::RenderWidget: caught unknown exception");
-		}	
+		}
+	}
+
+	void WailaUIManager::RenderCrafterInfo(IModLoaderImGui* imgui, const Waila::CrafterInfo& info)
+	{
+		char buf[512];
+
+		memset(buf, 0, sizeof(buf));
+		snprintf(buf, sizeof(buf) - 1, "Name:     %s", info.crafterClass.empty() ? "N/A" : info.crafterClass.c_str());
+		buf[sizeof(buf) - 1] = '\0';
+		imgui->Text(buf);
+
+		if (info.buildingDesc.empty())
+			imgui->Text("Desc:     N/A");
+		else
+			RenderWrappedDesc(imgui, info.buildingDesc);
+
+		memset(buf, 0, sizeof(buf));
+		snprintf(buf, sizeof(buf) - 1, "Speed:    %.2fx", info.craftingSpeed);
+		buf[sizeof(buf) - 1] = '\0';
+		imgui->Text(buf);
+
+		imgui->Separator();
+
+		memset(buf, 0, sizeof(buf));
+		snprintf(buf, sizeof(buf) - 1, "Crafting: %s%s",
+			info.currentRecipeDisplayName.empty() ? info.currentRecipe.c_str() : info.currentRecipeDisplayName.c_str(),
+			info.bOutputFull ? " (Output Full)" : "");
+		buf[sizeof(buf) - 1] = '\0';
+		imgui->Text(buf);
+
+		if (info.recipeBuildTime > 0.f)
+		{
+			float ipm = (60.f / info.recipeBuildTime) * info.recipeOutputCount;
+			char ipmBuf[32];
+			if (ipm == floorf(ipm))
+				snprintf(ipmBuf, sizeof(ipmBuf), "%d/pm", static_cast<int>(ipm));
+			else
+				snprintf(ipmBuf, sizeof(ipmBuf), "%.1f/pm", ipm);
+
+			float bt = info.recipeBuildTime;
+			char timeBuf[16];
+			if (bt == floorf(bt))
+				snprintf(timeBuf, sizeof(timeBuf), "%ds", static_cast<int>(bt));
+			else
+				snprintf(timeBuf, sizeof(timeBuf), "%.1fs", bt);
+
+			memset(buf, 0, sizeof(buf));
+			snprintf(buf, sizeof(buf) - 1, "Interval: %s (%s)", timeBuf, ipmBuf);
+			buf[sizeof(buf) - 1] = '\0';
+			imgui->Text(buf);
+		}
+
+		memset(buf, 0, sizeof(buf));
+		snprintf(buf, sizeof(buf) - 1, "Progress: %.1f%%", info.craftingProgress * 100.f);
+		buf[sizeof(buf) - 1] = '\0';
+		imgui->Text(buf);
+	}
+
+	void WailaUIManager::RenderStorageInfo(IModLoaderImGui* imgui, const Waila::StorageInfo& info)
+	{
+		char buf[512];
+
+		memset(buf, 0, sizeof(buf));
+		snprintf(buf, sizeof(buf) - 1, "Name:     %s", info.buildingName.c_str());
+		buf[sizeof(buf) - 1] = '\0';
+		imgui->Text(buf);
+
+		if (!info.buildingDesc.empty())
+			RenderWrappedDesc(imgui, info.buildingDesc);
+
+		imgui->Separator();
+
+		memset(buf, 0, sizeof(buf));
+		snprintf(buf, sizeof(buf) - 1, "Capacity: %d slots", info.maxCapacity);
+		buf[sizeof(buf) - 1] = '\0';
+		imgui->Text(buf);
+
+		for (const auto& item : info.storedItems)
+		{
+			memset(buf, 0, sizeof(buf));
+			snprintf(buf, sizeof(buf) - 1, "Storing %dx %s", item.count, item.displayName.c_str());
+			buf[sizeof(buf) - 1] = '\0';
+			imgui->Text(buf);
+		}
+	}
+
+	void WailaUIManager::RenderPowerInfo(IModLoaderImGui* imgui, const Waila::PowerInfo& info)
+	{
+		char buf[512];
+
+		memset(buf, 0, sizeof(buf));
+		snprintf(buf, sizeof(buf) - 1, "Name:     %s", info.buildingName.c_str());
+		buf[sizeof(buf) - 1] = '\0';
+		imgui->Text(buf);
+
+		if (!info.buildingDesc.empty())
+			RenderWrappedDesc(imgui, info.buildingDesc);
+
+		imgui->Separator();
+
+		const char* statusStr = "Not Connected";
+		if (info.gridConnectionStatus == 1)
+			statusStr = "Connected";
+		else if (info.gridConnectionStatus == 2)
+			statusStr = "Connected (Off)";
+
+		memset(buf, 0, sizeof(buf));
+		snprintf(buf, sizeof(buf) - 1, "Grid:     %s", statusStr);
+		buf[sizeof(buf) - 1] = '\0';
+		imgui->Text(buf);
+
+		memset(buf, 0, sizeof(buf));
+		snprintf(buf, sizeof(buf) - 1, "Output:   %.1f W", info.buildingPower);
+		buf[sizeof(buf) - 1] = '\0';
+		imgui->Text(buf);
+
+		imgui->Separator();
+
+		memset(buf, 0, sizeof(buf));
+		snprintf(buf, sizeof(buf) - 1, "Grid Gen: %.1f W", info.gridAddPower);
+		buf[sizeof(buf) - 1] = '\0';
+		imgui->Text(buf);
+
+		memset(buf, 0, sizeof(buf));
+		snprintf(buf, sizeof(buf) - 1, "Grid Use: %.1f W", info.gridRemovePower);
+		buf[sizeof(buf) - 1] = '\0';
+		imgui->Text(buf);
+
+		memset(buf, 0, sizeof(buf));
+		snprintf(buf, sizeof(buf) - 1, "Grid Cap: %.1f W", info.gridTotalPower);
+		buf[sizeof(buf) - 1] = '\0';
+		imgui->Text(buf);
+	}
+
+	static void RenderCoolerShared(IModLoaderImGui* imgui, const std::string& buildingName, const std::string& buildingDesc,
+		uint8_t state, int32_t connectedSockets, int32_t totalSockets)
+	{
+		char buf[512];
+
+		memset(buf, 0, sizeof(buf));
+		snprintf(buf, sizeof(buf) - 1, "Name:     %s", buildingName.c_str());
+		buf[sizeof(buf) - 1] = '\0';
+		imgui->Text(buf);
+
+		if (!buildingDesc.empty())
+			RenderWrappedDesc(imgui, buildingDesc);
+
+		imgui->Separator();
+
+		const char* stateStr = "Unknown";
+		switch (state)
+		{
+		case 0: stateStr = "Idle";         break;
+		case 1: stateStr = "Working";      break;
+		case 2: stateStr = "No Fuel";      break;
+		case 3: stateStr = "Too Hot/Cold"; break;
+		}
+
+		memset(buf, 0, sizeof(buf));
+		snprintf(buf, sizeof(buf) - 1, "State:    %s", stateStr);
+		buf[sizeof(buf) - 1] = '\0';
+		imgui->Text(buf);
+
+		memset(buf, 0, sizeof(buf));
+		snprintf(buf, sizeof(buf) - 1, "Sockets:  %d / %d", connectedSockets, totalSockets);
+		buf[sizeof(buf) - 1] = '\0';
+		imgui->Text(buf);
+	}
+
+	void WailaUIManager::RenderCoolerActiveInfo(IModLoaderImGui* imgui, const Waila::CoolerActiveInfo& info)
+	{
+		RenderCoolerShared(imgui, info.buildingName, info.buildingDesc, info.state, info.connectedSockets, info.totalSockets);
+	}
+
+	void WailaUIManager::RenderCoolerPassiveInfo(IModLoaderImGui* imgui, const Waila::CoolerPassiveInfo& info)
+	{
+		RenderCoolerShared(imgui, info.buildingName, info.buildingDesc, info.state, info.connectedSockets, info.totalSockets);
 	}
 }

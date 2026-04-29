@@ -4,6 +4,9 @@
 #include "Core/raycaster.h"
 #include "crafter_detector.h"
 #include "storage_detector.h"
+#include "power_detector.h"
+#include "cooler_active_detector.h"
+#include "cooler_passive_detector.h"
 #include "Engine_structs.hpp"
 #include <atomic>
 #include <mutex>
@@ -27,8 +30,12 @@ namespace Waila::UI
 		void Tick(float deltaSeconds);
 
 	private:
-		// Renders crafter info into the plugin widget via IModLoaderImGui*
 		void RenderWidget(IModLoaderImGui* imgui);
+		void RenderCrafterInfo(IModLoaderImGui* imgui, const Waila::CrafterInfo& info);
+		void RenderStorageInfo(IModLoaderImGui* imgui, const Waila::StorageInfo& info);
+		void RenderPowerInfo(IModLoaderImGui* imgui, const Waila::PowerInfo& info);
+		void RenderCoolerActiveInfo(IModLoaderImGui* imgui, const Waila::CoolerActiveInfo& info);
+		void RenderCoolerPassiveInfo(IModLoaderImGui* imgui, const Waila::CoolerPassiveInfo& info);
 
 		// Static C-linkage callbacks for plugin API registration
 		static void OnTick(float deltaSeconds);
@@ -47,6 +54,9 @@ namespace Waila::UI
 		std::mutex          m_infoMutex;
 		Waila::CrafterInfo  m_pendingInfo;
 		Waila::StorageInfo  m_pendingStorageInfo;
+		Waila::PowerInfo    m_pendingPowerInfo;
+		Waila::CoolerActiveInfo  m_pendingCoolerActiveInfo;
+		Waila::CoolerPassiveInfo m_pendingCoolerPassiveInfo;
 
 		// Last ray data for HUD debug visualisation — written by Tick, read by OnHUDPostRender
 		struct DebugRay

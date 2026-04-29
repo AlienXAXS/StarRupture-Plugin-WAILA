@@ -18,6 +18,9 @@ namespace Waila
 		float craftingSpeed = 1.f;           // CraftingSettings.CraftingSpeed multiplier
 		float recipeBuildTime = 0.f;         // UAuItemRecipeData::BuildTime in seconds
 		int32_t recipeOutputCount = 1;       // Items produced per cycle
+		int32_t craftingMultiplier = 1;      // FCrCraftingFragment::CraftingMultiplier
+		bool    bMissingItems = false;       // FCrCraftingFragment::bIsMissingItems
+		bool    bOutputFull   = false;       // FCrCraftingFragment::bOutputFull
 
 		// Returns true if this represents a valid crafter
 		bool IsValid() const

@@ -11,7 +11,7 @@ namespace Waila::Core
 	APawn* WailaRaycastSystem::GetLocalPlayer() const
 	{
 		UWorld* world = UWorld::GetWorld();
-		if (!world)
+		if (!world || !UKismetSystemLibrary::IsValid(world) || !world->GameState)
 			return nullptr;
 
 		APlayerController* pc = UGameplayStatics::GetPlayerController(world, 0);
@@ -42,7 +42,6 @@ namespace Waila::Core
 
 	bool WailaRaycastSystem::PerformRaycast(float maxDistance, RaycastHit& outHit)
 	{
-		LOG_DEBUG("PerformRaycast: maxDistance=%.1f", maxDistance);
 		outHit = {};
 
 		// Obtain world and pawn once — both can become null during a map transition
@@ -139,7 +138,7 @@ namespace Waila::Core
 			std::string actorName  = hitActor ? UKismetSystemLibrary::GetObjectName(hitActor).ToString()  : "(null actor)";
 			std::string compName   = comp     ? UKismetSystemLibrary::GetObjectName(comp).ToString()      : "(null comp)";
 			std::string boneName   = hitResult.BoneName.ToString();
-			LOG_DEBUG("Raycast hit | actor=\"%s\" comp=\"%s\" bone=\"%s\" dist=%.1f",
+			LOG_TRACE("Raycast hit | actor=\"%s\" comp=\"%s\" bone=\"%s\" dist=%.1f",
 				actorName.c_str(), compName.c_str(), boneName.c_str(), hitResult.Distance);
 		}
 

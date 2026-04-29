@@ -17,16 +17,11 @@ namespace WailaPluginConfig
 			"Raycasting",
 			"MaxDistance",
 			ConfigValueType::Float,
-			"675.0",
-			"Maximum distance for WAILA raycast (units)"
+			"650.0",
+			"Maximum distance for WAILA raycast (units)",
+			0.0f,
+			2500.0f
 		},
-		{
-			"UI",
-			"WindowOpacity",
-			ConfigValueType::Float,
-			"0.85",
-			"WAILA window transparency (0.0 = transparent, 1.0 = opaque)"
-		}
 	};
 
 	static const ConfigSchema SCHEMA = {
@@ -57,12 +52,7 @@ namespace WailaPluginConfig
 
 		static float GetMaxDistance()
 		{
-			return s_self ? s_self->config->ReadFloat(s_self, "Raycasting", "MaxDistance", 256.0f) : 256.0f;
-		}
-
-		static float GetWindowOpacity()
-		{
-			return s_self ? s_self->config->ReadFloat(s_self, "UI", "WindowOpacity", 0.85f) : 0.85f;
+			return s_self ? s_self->config->ReadFloat(s_self, "Raycasting", "MaxDistance", 650.0f) : 650.0f;
 		}
 
 	private:
