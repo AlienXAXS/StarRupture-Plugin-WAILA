@@ -11,6 +11,19 @@ static IPluginSelf* g_self = nullptr;
 
 IPluginSelf* GetSelf() { return g_self; }
 
+// Plugin metadata
+#ifndef MODLOADER_BUILD_TAG
+#define MODLOADER_BUILD_TAG "dev"
+#endif
+
+static PluginInfo s_pluginInfo = {
+	"Waila",
+	MODLOADER_BUILD_TAG,
+	"AlienX",
+	"Minecraft style What Am I Looking At?",
+	PLUGIN_INTERFACE_VERSION
+};
+
 // Global UI manager instance
 static Waila::UI::WailaUIManager* g_uiManager = nullptr;
 
@@ -47,19 +60,6 @@ static void OnWorldEndPlay(SDK::UWorld* world, const char* worldName)
 	}
 	LOG_DEBUG("OnWorldEndPlay: done");
 }
-
-// Plugin metadata
-#ifndef MODLOADER_BUILD_TAG
-#define MODLOADER_BUILD_TAG "dev"
-#endif
-
-static PluginInfo s_pluginInfo = {
-	"Waila",
-	MODLOADER_BUILD_TAG,
-	"AlienX",
-	"Minecraft style What Am I Looking At?",
-	PLUGIN_INTERFACE_VERSION
-};
 
 extern "C" {
 
