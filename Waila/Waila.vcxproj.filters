@@ -30,7 +30,13 @@
     <ClInclude Include="plugin_helpers.h">
       <Filter>Plugin</Filter>
     </ClInclude>
+    <ClInclude Include="waila_functions.h">
+      <Filter>Plugin</Filter>
+    </ClInclude>
     <ClInclude Include="Core\raycaster.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\recipe_clipboard.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="crafter_detector.h">
@@ -110,7 +116,9 @@
     <ClCompile Include="waila_functions.cpp">
       <Filter>Plugin</Filter>
     </ClCompile>
-    <ClCompile Include="$(StarRuptureSDKSourceDir)AuActorPlacement_functions.cpp" />
+    <ClCompile Include="$(StarRuptureSDKSourceDir)AuActorPlacement_functions.cpp">
+      <Filter>Plugin</Filter>
+    </ClCompile>
     <ClCompile Include="cargo_receiver_detector.cpp">
       <Filter>Handlers</Filter>
     </ClCompile>

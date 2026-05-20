@@ -300,7 +300,9 @@
     <ClInclude Include="plugin.h" />
     <ClInclude Include="plugin_config.h" />
     <ClInclude Include="plugin_helpers.h" />
+    <ClInclude Include="waila_functions.h" />
     <ClInclude Include="Core\raycaster.h" />
+    <ClInclude Include="Core\recipe_clipboard.h" />
     <ClInclude Include="crafter_detector.h" />
     <ClInclude Include="storage_detector.h" />
     <ClInclude Include="power_detector.h" />

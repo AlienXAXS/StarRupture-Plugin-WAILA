@@ -3,7 +3,7 @@
 #include <string>
 
 // Forward declare to avoid pulling in heavy SDK headers in this header
-namespace SDK { class AActor; }
+namespace SDK { class AActor; class UCrItemRecipeData; }
 
 namespace Waila
 {
@@ -22,7 +22,10 @@ namespace Waila
 		bool    bMissingItems = false;       // FCrCraftingFragment::bIsMissingItems
 		bool    bOutputFull   = false;       // FCrCraftingFragment::bOutputFull
 
-		// Returns true if this represents a valid crafter
+		// Populated for clipboard/paste use — null when building is idle
+		SDK::UCrItemRecipeData* recipeDataPtr = nullptr;
+		SDK::AActor*            actorPtr      = nullptr;
+
 		bool IsValid() const
 		{
 			return !crafterName.empty();

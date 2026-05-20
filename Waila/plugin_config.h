@@ -1,10 +1,10 @@
 #pragma once
 
 #include "plugin_interface.h"
+#include <string>
 
 namespace WailaPluginConfig
 {
-	// Define config schema with a few simple examples
 	static const ConfigEntry CONFIG_ENTRIES[] = {
 		{
 			"General",
@@ -28,6 +28,27 @@ namespace WailaPluginConfig
 			ConfigValueType::Boolean,
 			"true",
 			"Whether to render building descriptions in the WAILA widget"
+		},
+		{
+			"Hotkeys",
+			"Copy Recipe Key",
+			ConfigValueType::Keybind,
+			"C",
+			"Key to copy recipe from the looked-at building"
+		},
+		{
+			"Hotkeys",
+			"Paste Recipe Key",
+			ConfigValueType::Keybind,
+			"V",
+			"Key to paste clipboard recipe onto the looked-at building"
+		},
+		{
+			"Hotkeys",
+			"Lock Recipe Key",
+			ConfigValueType::Keybind,
+			"L",
+			"Key to toggle recipe lock mode (auto-paste on new placements)"
 		}
 	};
 
@@ -65,6 +86,27 @@ namespace WailaPluginConfig
 		static bool ShouldRenderDescriptions()
 		{
 			return s_self ? s_self->config->ReadBool(s_self, "WAILA", "Render Building Descriptions", true) : true;
+		}
+
+		static std::string GetCopyKey()
+		{
+			char buf[32] = "C";
+			if (s_self) s_self->config->ReadString(s_self, "Hotkeys", "Copy Recipe Key", buf, sizeof(buf), "C");
+			return buf;
+		}
+
+		static std::string GetPasteKey()
+		{
+			char buf[32] = "V";
+			if (s_self) s_self->config->ReadString(s_self, "Hotkeys", "Paste Recipe Key", buf, sizeof(buf), "V");
+			return buf;
+		}
+
+		static std::string GetLockKey()
+		{
+			char buf[32] = "L";
+			if (s_self) s_self->config->ReadString(s_self, "Hotkeys", "Lock Recipe Key", buf, sizeof(buf), "L");
+			return buf;
 		}
 
 	private:
