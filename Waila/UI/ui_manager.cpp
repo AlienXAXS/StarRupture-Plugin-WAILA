@@ -324,13 +324,18 @@ namespace Waila::UI
 
 		if (m_toastTimeRemaining <= 0.f || m_toastMessage.empty()) return;
 
-		LOG_TRACE("WAILA Toast: calling GetDisplaySize");
 		float dispW = 1920.f, dispH = 1080.f;
 		imgui->GetDisplaySize(&dispW, &dispH);
-		LOG_TRACE("WAILA Toast: display=%.0fx%.0f", dispW, dispH);
 
-		m_toastWindowHints.pos_x = dispW * 0.5f;
-		m_toastWindowHints.pos_y = dispH * 0.58f;
+		// Measure text and size window to fit with padding
+		float textW = 0.f, textH = 0.f;
+		imgui->CalcTextSize(m_toastMessage.c_str(), &textW, &textH, false, -1.f);
+		constexpr float kPadX = 16.f;
+		constexpr float kPadY = 12.f;
+		m_toastWindowHints.width  = textW + kPadX * 2.f;
+		m_toastWindowHints.height = textH + kPadY * 2.f;
+		m_toastWindowHints.pos_x  = dispW * 0.5f;
+		m_toastWindowHints.pos_y  = dispH * 0.58f;
 
 		LOG_TRACE("WAILA Toast: calling TextColored");
 		imgui->TextColored(1.0f, 1.0f, 0.3f, 1.0f, m_toastMessage.c_str());
@@ -345,6 +350,12 @@ namespace Waila::UI
 		if (!actor || !clip.recipeData)
 		{
 			LOG_WARN("WAILA ApplyRecipe: null actor or recipeData");
+			return;
+		}
+
+		if (strstr(actor->GetName().c_str(), "BP_MechanicalDrill_C") != nullptr)
+		{
+			LOG_INFO("WAILA ApplyRecipe: skipping excluded actor '%s'", actor->GetName().c_str());
 			return;
 		}
 
@@ -454,21 +465,23 @@ namespace Waila::UI
 		// Process deferred key actions (input thread set flags, game thread executes)
 		if (m_copyPending.exchange(false))
 		{
-			LOG_INFO("WAILA Copy: action triggered, raycasting at distance %.1f", m_actionRaycastDistance);
+			LOG_TRACE("WAILA Copy: action triggered, raycasting at distance %.1f", m_actionRaycastDistance);
 			Waila::Core::RaycastHit ah;
 			bool bActionHit = m_raycaster.PerformRaycast(m_actionRaycastDistance, ah);
-			LOG_INFO("WAILA Copy: raycast hit=%d actor=%p", bActionHit, bActionHit ? ah.actor : nullptr);
+			LOG_TRACE("WAILA Copy: raycast hit=%d actor=%p", bActionHit, bActionHit ? ah.actor : nullptr);
 
 			Waila::CrafterInfo snap;
 			if (bActionHit && ah.actor)
 			{
 				bool isCrafter = Waila::CrafterDetector::IsCrafter(ah.actor);
-				LOG_INFO("WAILA Copy: IsCrafter=%d", isCrafter);
-				if (isCrafter)
+				LOG_TRACE("WAILA Copy: IsCrafter=%d", isCrafter);
+				if (isCrafter && strstr(ah.actor->GetName().c_str(), "BP_MechanicalDrill_C") == nullptr)
 					Waila::CrafterDetector::GetCrafterInfo(ah.actor, snap);
+				else if (isCrafter)
+					LOG_INFO("WAILA Copy: skipping excluded actor '%s'", ah.actor->GetName().c_str());
 			}
 
-			LOG_INFO("WAILA Copy: snap.IsValid=%d recipe='%s' recipeDataPtr=%p",
+			LOG_TRACE("WAILA Copy: snap.IsValid=%d recipe='%s' recipeDataPtr=%p",
 				snap.IsValid(), snap.currentRecipe.c_str(), snap.recipeDataPtr);
 
 			if (snap.IsValid() && snap.currentRecipe != "(idle)" && snap.recipeDataPtr)
@@ -488,7 +501,7 @@ namespace Waila::UI
 
 		if (m_pastePending.exchange(false))
 		{
-			LOG_INFO("WAILA Paste: action triggered, clipboard.IsValid=%d buildingClass='%s' recipe='%s' recipeData=%p",
+			LOG_TRACE("WAILA Paste: action triggered, clipboard.IsValid=%d buildingClass='%s' recipe='%s' recipeData=%p",
 				m_clipboard.IsValid(), m_clipboard.buildingClass.c_str(),
 				m_clipboard.recipeDisplayName.c_str(), m_clipboard.recipeData);
 
@@ -498,38 +511,42 @@ namespace Waila::UI
 			}
 			else
 			{
-				LOG_INFO("WAILA Paste: raycasting at distance %.1f", m_actionRaycastDistance);
+				LOG_TRACE("WAILA Paste: raycasting at distance %.1f", m_actionRaycastDistance);
 				Waila::Core::RaycastHit ah;
 				bool bActionHit = m_raycaster.PerformRaycast(m_actionRaycastDistance, ah);
-				LOG_INFO("WAILA Paste: raycast hit=%d actor=%p", bActionHit, bActionHit ? ah.actor : nullptr);
+				LOG_TRACE("WAILA Paste: raycast hit=%d actor=%p", bActionHit, bActionHit ? ah.actor : nullptr);
 
 				Waila::CrafterInfo snap;
 				if (bActionHit && ah.actor)
 				{
 					bool isCrafter = Waila::CrafterDetector::IsCrafter(ah.actor);
-					LOG_INFO("WAILA Paste: IsCrafter=%d", isCrafter);
+					LOG_TRACE("WAILA Paste: IsCrafter=%d", isCrafter);
 					if (isCrafter)
 						Waila::CrafterDetector::GetCrafterInfo(ah.actor, snap);
 				}
 
-				LOG_INFO("WAILA Paste: snap.IsValid=%d actorPtr=%p crafterClass='%s'",
+				LOG_TRACE("WAILA Paste: snap.IsValid=%d actorPtr=%p crafterClass='%s'",
 					snap.IsValid(), snap.actorPtr, snap.crafterClass.c_str());
 
 				if (!snap.IsValid() || !snap.actorPtr)
+				{
 					LOG_INFO("WAILA Paste: not looking at a crafter");
+				}
 				else
 				{
-					LOG_TRACE("WAILA Paste: class comparison target='%s'(%d) clipboard='%s'(%d) match=%d",
-						snap.crafterClass.c_str(), (int)snap.crafterClass.size(),
-						m_clipboard.buildingClass.c_str(), (int)m_clipboard.buildingClass.size(),
-						snap.crafterClass == m_clipboard.buildingClass);
+					bool classMatch = (snap.crafterClass == m_clipboard.buildingClass);
+					LOG_TRACE("WAILA Paste: classMatch=%d targetLen=%d clipLen=%d",
+						classMatch, (int)snap.crafterClass.size(), (int)m_clipboard.buildingClass.size());
 
-					if (snap.crafterClass != m_clipboard.buildingClass)
+					if (!classMatch)
+					{
 						LOG_INFO("WAILA Paste: building type mismatch (target='%s' clipboard='%s')",
 							snap.crafterClass.c_str(), m_clipboard.buildingClass.c_str());
+					}
 					else
 					{
-						LOG_INFO("WAILA Paste: applying '%s' to %s", m_clipboard.recipeDisplayName.c_str(), snap.crafterClass.c_str());
+						LOG_INFO("WAILA Paste: applying '%s' to %s",
+							m_clipboard.recipeDisplayName.c_str(), snap.crafterClass.c_str());
 						ApplyRecipeToCrafter(snap.actorPtr, m_clipboard);
 						if (m_showActionToast)
 							ShowToast(m_clipboard.recipeDisplayName + " Pasted To " + snap.crafterClass + "!");
@@ -540,21 +557,21 @@ namespace Waila::UI
 
 		if (m_lockPending.exchange(false))
 		{
-			LOG_INFO("WAILA Lock: action triggered, raycasting at distance %.1f", m_actionRaycastDistance);
+			LOG_TRACE("WAILA Lock: action triggered, raycasting at distance %.1f", m_actionRaycastDistance);
 			Waila::Core::RaycastHit ah;
 			bool bActionHit = m_raycaster.PerformRaycast(m_actionRaycastDistance, ah);
-			LOG_INFO("WAILA Lock: raycast hit=%d actor=%p", bActionHit, bActionHit ? ah.actor : nullptr);
+			LOG_TRACE("WAILA Lock: raycast hit=%d actor=%p", bActionHit, bActionHit ? ah.actor : nullptr);
 
 			Waila::CrafterInfo snap;
 			if (bActionHit && ah.actor)
 			{
 				bool isCrafter = Waila::CrafterDetector::IsCrafter(ah.actor);
-				LOG_INFO("WAILA Lock: IsCrafter=%d", isCrafter);
+				LOG_TRACE("WAILA Lock: IsCrafter=%d", isCrafter);
 				if (isCrafter)
 					Waila::CrafterDetector::GetCrafterInfo(ah.actor, snap);
 			}
 
-			LOG_INFO("WAILA Lock: snap.IsValid=%d recipe='%s' recipeDataPtr=%p",
+			LOG_TRACE("WAILA Lock: snap.IsValid=%d recipe='%s' recipeDataPtr=%p",
 				snap.IsValid(), snap.currentRecipe.c_str(), snap.recipeDataPtr);
 
 			if (snap.IsValid() && snap.currentRecipe != "(idle)" && snap.recipeDataPtr)
