@@ -24,6 +24,22 @@ namespace WailaPluginConfig
 		},
 		{
 			"WAILA",
+			"Action Distance",
+			ConfigValueType::Float,
+			"3000.0",
+			"Maximum distance for copy/paste/lock raycasts (units)",
+			650.0f,
+			10000.0f
+		},
+		{
+			"WAILA",
+			"Show Action Toast",
+			ConfigValueType::Boolean,
+			"true",
+			"Show a toast notification when copying, pasting, or locking a recipe"
+		},
+		{
+			"WAILA",
 			"Render Building Descriptions",
 			ConfigValueType::Boolean,
 			"true",
@@ -81,6 +97,16 @@ namespace WailaPluginConfig
 		static float GetMaxDistance()
 		{
 			return s_self ? s_self->config->ReadFloat(s_self, "WAILA", "Max Distance", 650.0f) : 650.0f;
+		}
+
+		static float GetActionDistance()
+		{
+			return s_self ? s_self->config->ReadFloat(s_self, "WAILA", "Action Distance", 3000.0f) : 3000.0f;
+		}
+
+		static bool GetShowActionToast()
+		{
+			return s_self ? s_self->config->ReadBool(s_self, "WAILA", "Show Action Toast", true) : true;
 		}
 
 		static bool ShouldRenderDescriptions()

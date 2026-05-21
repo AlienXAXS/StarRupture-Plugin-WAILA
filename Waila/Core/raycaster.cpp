@@ -138,8 +138,7 @@ namespace Waila::Core
 			std::string actorName  = hitActor ? UKismetSystemLibrary::GetObjectName(hitActor).ToString()  : "(null actor)";
 			std::string compName   = comp     ? UKismetSystemLibrary::GetObjectName(comp).ToString()      : "(null comp)";
 			std::string boneName   = hitResult.BoneName.ToString();
-			LOG_TRACE("Raycast hit | actor=\"%s\" comp=\"%s\" bone=\"%s\" dist=%.1f",
-				actorName.c_str(), compName.c_str(), boneName.c_str(), hitResult.Distance);
+			//LOG_TRACE("Raycast hit | actor=\"%s\" comp=\"%s\" bone=\"%s\" dist=%.1f", actorName.c_str(), compName.c_str(), boneName.c_str(), hitResult.Distance);
 		}
 
 		outHit.actor    = hitActor;

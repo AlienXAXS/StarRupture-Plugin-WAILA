@@ -42,72 +42,29 @@ namespace Waila::UI
 		}
 	}
 
+	void WailaUIManager::OnRenderToastWidget(IModLoaderImGui* imgui)
+	{
+		if (s_instance && imgui)
+		{
+			s_instance->RenderToastWidget(imgui);
+		}
+	}
+
 	void WailaUIManager::OnCopyKey(EModKey, EModKeyEvent)
 	{
-		if (!s_instance) return;
-
-		Waila::CrafterInfo snapshot;
-		SDK::AActor*            hitActor   = nullptr;
-		SDK::UCrItemRecipeData* recipeData = nullptr;
-		{
-			std::lock_guard<std::mutex> lock(s_instance->m_infoMutex);
-			snapshot   = s_instance->m_pendingInfo;
-			hitActor   = s_instance->m_lastHitActor;
-			recipeData = s_instance->m_lastRecipeData;
-		}
-
-		if (!snapshot.IsValid() || snapshot.currentRecipe == "(idle)" || !recipeData)
-		{
-			LOG_INFO("WAILA Copy: nothing to copy (no crafter in view or no recipe set)");
-			return;
-		}
-
-		s_instance->m_clipboard.buildingClass     = snapshot.crafterClass;
-		s_instance->m_clipboard.recipeDisplayName = snapshot.currentRecipeDisplayName;
-		s_instance->m_clipboard.recipeData        = recipeData;
-		LOG_INFO("WAILA Copy: copied '%s' from %s",
-			snapshot.currentRecipeDisplayName.c_str(), snapshot.crafterClass.c_str());
+		if (s_instance) s_instance->m_copyPending = true;
 	}
 
 	void WailaUIManager::OnPasteKey(EModKey, EModKeyEvent)
 	{
-		if (!s_instance) return;
-
-		if (!s_instance->m_clipboard.IsValid())
-		{
-			LOG_INFO("WAILA Paste: clipboard is empty");
-			return;
-		}
-
-		Waila::CrafterInfo snapshot;
-		SDK::AActor* hitActor = nullptr;
-		{
-			std::lock_guard<std::mutex> lock(s_instance->m_infoMutex);
-			snapshot = s_instance->m_pendingInfo;
-			hitActor = s_instance->m_lastHitActor;
-		}
-
-		if (!snapshot.IsValid() || !hitActor)
-		{
-			LOG_INFO("WAILA Paste: not looking at a crafter");
-			return;
-		}
-
-		if (snapshot.crafterClass != s_instance->m_clipboard.buildingClass)
-		{
-			LOG_INFO("WAILA Paste: building type mismatch (%s vs %s)",
-				snapshot.crafterClass.c_str(), s_instance->m_clipboard.buildingClass.c_str());
-			return;
-		}
-
-		s_instance->ApplyRecipeToCrafter(hitActor, s_instance->m_clipboard);
+		if (s_instance) s_instance->m_pastePending = true;
 	}
 
 	void WailaUIManager::OnLockKey(EModKey, EModKeyEvent)
 	{
 		if (!s_instance) return;
 
-		// Pressing L while lock is already active clears it
+		// Deactivation needs no engine calls — handle immediately
 		if (s_instance->m_lockActive)
 		{
 			s_instance->m_lockActive = false;
@@ -118,30 +75,7 @@ namespace Waila::UI
 			return;
 		}
 
-		// Lock directly from whatever crafter the player is currently looking at
-		Waila::CrafterInfo snapshot;
-		SDK::UCrItemRecipeData* recipeData = nullptr;
-		{
-			std::lock_guard<std::mutex> lock(s_instance->m_infoMutex);
-			snapshot   = s_instance->m_pendingInfo;
-			recipeData = s_instance->m_lastRecipeData;
-		}
-
-		if (!snapshot.IsValid() || snapshot.currentRecipe == "(idle)" || !recipeData)
-		{
-			LOG_INFO("WAILA Lock: not looking at a crafter with a recipe set");
-			return;
-		}
-
-		s_instance->m_lockRecipe.buildingClass     = snapshot.crafterClass;
-		s_instance->m_lockRecipe.recipeDisplayName = snapshot.currentRecipeDisplayName;
-		s_instance->m_lockRecipe.recipeData        = recipeData;
-		s_instance->m_lockActive                   = true;
-		s_instance->m_pastedActors.clear();
-		s_instance->SetLockWidgetVisible(true);
-		LOG_INFO("WAILA Lock: locked '%s' for %s",
-			s_instance->m_lockRecipe.recipeDisplayName.c_str(),
-			s_instance->m_lockRecipe.buildingClass.c_str());
+		s_instance->m_lockPending = true;
 	}
 
 
@@ -168,9 +102,12 @@ namespace Waila::UI
 			return;
 		}
 
-		LOG_DEBUG("WailaUIManager::Initialize: reading MaxDistance from config");
-		m_maxDistance = WailaPluginConfig::Config::GetMaxDistance();
-		LOG_DEBUG("WailaUIManager::Initialize: MaxDistance = %.1f", m_maxDistance);
+		LOG_DEBUG("WailaUIManager::Initialize: reading distances from config");
+		m_maxDistance           = WailaPluginConfig::Config::GetMaxDistance();
+		m_actionRaycastDistance = WailaPluginConfig::Config::GetActionDistance();
+		m_showActionToast       = WailaPluginConfig::Config::GetShowActionToast();
+		LOG_DEBUG("WailaUIManager::Initialize: MaxDistance = %.1f, ActionDistance = %.1f, ShowActionToast = %d",
+			m_maxDistance, m_actionRaycastDistance, m_showActionToast);
 
 		LOG_DEBUG("WailaUIManager::Initialize: complete");
 	}
@@ -227,6 +164,32 @@ namespace Waila::UI
 					m_self->hooks->UI->SetWidgetVisible(m_lockWidgetHandle, false);
 					m_lockWidgetVisible = false;
 				}
+
+				// Toast notification widget — centered slightly below screen middle
+				m_toastWindowHints.width    = 0.f;
+				m_toastWindowHints.height   = 0.f;
+				m_toastWindowHints.pos_x    = 960.f;  // updated each frame via GetDisplaySize
+				m_toastWindowHints.pos_y    = 620.f;
+				m_toastWindowHints.pivot_x  = 0.5f;
+				m_toastWindowHints.pivot_y  = 0.5f;
+				m_toastWindowHints.size_cond = 0;
+				m_toastWindowHints.pos_cond  = 0;  // Always re-apply position
+
+				m_toastWidgetDesc.name        = "WAILA Toast";
+				m_toastWidgetDesc.renderFn    = &WailaUIManager::OnRenderToastWidget;
+				m_toastWidgetDesc.windowHints = &m_toastWindowHints;
+
+				m_toastWidgetHandle = m_self->hooks->UI->RegisterWidget(&m_toastWidgetDesc);
+				if (m_toastWidgetHandle)
+				{
+					m_self->hooks->UI->SetWidgetVisible(m_toastWidgetHandle, false);
+				}
+			}
+
+			// Listen for live config changes
+			if (m_self->hooks->UI)
+			{
+				m_self->hooks->UI->RegisterOnConfigChanged(&OnConfigChanged);
 			}
 
 			// Register hotkeys
@@ -275,6 +238,12 @@ namespace Waila::UI
 					m_lockWidgetHandle  = nullptr;
 					m_lockWidgetVisible = false;
 				}
+				if (m_toastWidgetHandle)
+				{
+					m_self->hooks->UI->UnregisterWidget(m_toastWidgetHandle);
+					m_toastWidgetHandle    = nullptr;
+					m_toastTimeRemaining   = 0.f;
+				}
 			}
 
 			if (m_self->hooks->Input)
@@ -285,6 +254,11 @@ namespace Waila::UI
 				m_self->hooks->Input->UnregisterKeybindByName(copyKey.c_str(),  EModKeyEvent::Pressed, &OnCopyKey);
 				m_self->hooks->Input->UnregisterKeybindByName(pasteKey.c_str(), EModKeyEvent::Pressed, &OnPasteKey);
 				m_self->hooks->Input->UnregisterKeybindByName(lockKey.c_str(),  EModKeyEvent::Pressed, &OnLockKey);
+			}
+
+			if (m_self->hooks->UI)
+			{
+				m_self->hooks->UI->UnregisterOnConfigChanged(&OnConfigChanged);
 			}
 		}
 
@@ -311,12 +285,72 @@ namespace Waila::UI
 		}
 	}
 
+	void WailaUIManager::OnConfigChanged(const char* section, const char* /*key*/, const char* /*newValue*/)
+	{
+		if (!s_instance || strcmp(section, "WAILA") != 0) return;
+		s_instance->m_maxDistance           = WailaPluginConfig::Config::GetMaxDistance();
+		s_instance->m_actionRaycastDistance = WailaPluginConfig::Config::GetActionDistance();
+		s_instance->m_showActionToast       = WailaPluginConfig::Config::GetShowActionToast();
+		LOG_INFO("WAILA: config updated — MaxDistance=%.1f ActionDistance=%.1f",
+			s_instance->m_maxDistance, s_instance->m_actionRaycastDistance);
+	}
+
+	void WailaUIManager::ShowToast(const std::string& message)
+	{
+		LOG_TRACE("WAILA Toast: ShowToast called msg='%s'", message.c_str());
+		LOG_TRACE("WAILA Toast: m_self=%p hooks=%p UI=%p handle=%p",
+			m_self,
+			m_self ? m_self->hooks : nullptr,
+			(m_self && m_self->hooks) ? m_self->hooks->UI : nullptr,
+			m_toastWidgetHandle);
+
+		if (!m_self || !m_self->hooks || !m_self->hooks->UI || !m_toastWidgetHandle)
+		{
+			LOG_TRACE("WAILA Toast: ShowToast aborted — null pointer");
+			return;
+		}
+
+		m_toastMessage       = message;
+		m_toastTimeRemaining = 1.5f;
+		LOG_TRACE("WAILA Toast: calling SetWidgetVisible(true)");
+		m_self->hooks->UI->SetWidgetVisible(m_toastWidgetHandle, true);
+		LOG_TRACE("WAILA Toast: SetWidgetVisible returned");
+	}
+
+	void WailaUIManager::RenderToastWidget(IModLoaderImGui* imgui)
+	{
+		LOG_TRACE("WAILA Toast: RenderToastWidget called timeRemaining=%.2f msg='%s'",
+			m_toastTimeRemaining, m_toastMessage.c_str());
+
+		if (m_toastTimeRemaining <= 0.f || m_toastMessage.empty()) return;
+
+		LOG_TRACE("WAILA Toast: calling GetDisplaySize");
+		float dispW = 1920.f, dispH = 1080.f;
+		imgui->GetDisplaySize(&dispW, &dispH);
+		LOG_TRACE("WAILA Toast: display=%.0fx%.0f", dispW, dispH);
+
+		m_toastWindowHints.pos_x = dispW * 0.5f;
+		m_toastWindowHints.pos_y = dispH * 0.58f;
+
+		LOG_TRACE("WAILA Toast: calling TextColored");
+		imgui->TextColored(1.0f, 1.0f, 0.3f, 1.0f, m_toastMessage.c_str());
+		LOG_TRACE("WAILA Toast: RenderToastWidget complete");
+	}
+
 	void WailaUIManager::ApplyRecipeToCrafter(SDK::AActor* actor, const Waila::RecipeClipboard& clip)
 	{
-		if (!actor || !clip.recipeData) return;
+		LOG_TRACE("WAILA ApplyRecipe: actor=%p recipeData=%p recipe='%s'",
+			actor, clip.recipeData, clip.recipeDisplayName.c_str());
+
+		if (!actor || !clip.recipeData)
+		{
+			LOG_WARN("WAILA ApplyRecipe: null actor or recipeData");
+			return;
+		}
 
 		auto fnCtor = Waila::Functions::GetMassActorHelperCtor();
 		auto fnAdd  = Waila::Functions::GetAddItemToCraft();
+		LOG_TRACE("WAILA ApplyRecipe: fnCtor=%p fnAdd=%p", fnCtor, fnAdd);
 		if (!fnCtor || !fnAdd)
 		{
 			LOG_WARN("WAILA ApplyRecipe: function pointers not resolved — check pattern scan");
@@ -324,15 +358,19 @@ namespace Waila::UI
 		}
 
 		SDK::UWorld* world = SDK::UWorld::GetWorld();
+		LOG_TRACE("WAILA ApplyRecipe: world=%p", world);
 		if (!world) return;
 
 		SDK::APlayerController* pc = SDK::UGameplayStatics::GetPlayerController(world, 0);
 		SDK::ACrPlayerControllerBase* crPc = static_cast<SDK::ACrPlayerControllerBase*>(pc);
+		LOG_TRACE("WAILA ApplyRecipe: pc=%p crPc=%p", pc, crPc);
 		if (!crPc) return;
 
+		LOG_TRACE("WAILA ApplyRecipe: calling fnCtor");
 		SDK::FCrMassActorReplicationHelper helper{};
 		fnCtor(&helper, actor);
 
+		LOG_TRACE("WAILA ApplyRecipe: calling fnAdd");
 		fnAdd(crPc, helper, clip.recipeData, 1);
 		LOG_INFO("WAILA ApplyRecipe: applied '%s' to %s",
 			clip.recipeDisplayName.c_str(), actor->GetName().c_str());
@@ -413,6 +451,130 @@ namespace Waila::UI
 			m_lastRecipeData = info.IsValid() ? info.recipeDataPtr : nullptr;
 		}
 
+		// Process deferred key actions (input thread set flags, game thread executes)
+		if (m_copyPending.exchange(false))
+		{
+			LOG_INFO("WAILA Copy: action triggered, raycasting at distance %.1f", m_actionRaycastDistance);
+			Waila::Core::RaycastHit ah;
+			bool bActionHit = m_raycaster.PerformRaycast(m_actionRaycastDistance, ah);
+			LOG_INFO("WAILA Copy: raycast hit=%d actor=%p", bActionHit, bActionHit ? ah.actor : nullptr);
+
+			Waila::CrafterInfo snap;
+			if (bActionHit && ah.actor)
+			{
+				bool isCrafter = Waila::CrafterDetector::IsCrafter(ah.actor);
+				LOG_INFO("WAILA Copy: IsCrafter=%d", isCrafter);
+				if (isCrafter)
+					Waila::CrafterDetector::GetCrafterInfo(ah.actor, snap);
+			}
+
+			LOG_INFO("WAILA Copy: snap.IsValid=%d recipe='%s' recipeDataPtr=%p",
+				snap.IsValid(), snap.currentRecipe.c_str(), snap.recipeDataPtr);
+
+			if (snap.IsValid() && snap.currentRecipe != "(idle)" && snap.recipeDataPtr)
+			{
+				m_clipboard.buildingClass     = snap.crafterClass;
+				m_clipboard.recipeDisplayName = snap.currentRecipeDisplayName;
+				m_clipboard.recipeData        = snap.recipeDataPtr;
+				LOG_INFO("WAILA Copy: copied '%s' from %s", snap.currentRecipeDisplayName.c_str(), snap.crafterClass.c_str());
+				if (m_showActionToast)
+					ShowToast(snap.currentRecipeDisplayName + " Copied From " + snap.crafterClass + "!");
+			}
+			else
+			{
+				LOG_INFO("WAILA Copy: nothing to copy (no crafter in view or no recipe set)");
+			}
+		}
+
+		if (m_pastePending.exchange(false))
+		{
+			LOG_INFO("WAILA Paste: action triggered, clipboard.IsValid=%d buildingClass='%s' recipe='%s' recipeData=%p",
+				m_clipboard.IsValid(), m_clipboard.buildingClass.c_str(),
+				m_clipboard.recipeDisplayName.c_str(), m_clipboard.recipeData);
+
+			if (!m_clipboard.IsValid())
+			{
+				LOG_INFO("WAILA Paste: clipboard is empty");
+			}
+			else
+			{
+				LOG_INFO("WAILA Paste: raycasting at distance %.1f", m_actionRaycastDistance);
+				Waila::Core::RaycastHit ah;
+				bool bActionHit = m_raycaster.PerformRaycast(m_actionRaycastDistance, ah);
+				LOG_INFO("WAILA Paste: raycast hit=%d actor=%p", bActionHit, bActionHit ? ah.actor : nullptr);
+
+				Waila::CrafterInfo snap;
+				if (bActionHit && ah.actor)
+				{
+					bool isCrafter = Waila::CrafterDetector::IsCrafter(ah.actor);
+					LOG_INFO("WAILA Paste: IsCrafter=%d", isCrafter);
+					if (isCrafter)
+						Waila::CrafterDetector::GetCrafterInfo(ah.actor, snap);
+				}
+
+				LOG_INFO("WAILA Paste: snap.IsValid=%d actorPtr=%p crafterClass='%s'",
+					snap.IsValid(), snap.actorPtr, snap.crafterClass.c_str());
+
+				if (!snap.IsValid() || !snap.actorPtr)
+					LOG_INFO("WAILA Paste: not looking at a crafter");
+				else
+				{
+					LOG_TRACE("WAILA Paste: class comparison target='%s'(%d) clipboard='%s'(%d) match=%d",
+						snap.crafterClass.c_str(), (int)snap.crafterClass.size(),
+						m_clipboard.buildingClass.c_str(), (int)m_clipboard.buildingClass.size(),
+						snap.crafterClass == m_clipboard.buildingClass);
+
+					if (snap.crafterClass != m_clipboard.buildingClass)
+						LOG_INFO("WAILA Paste: building type mismatch (target='%s' clipboard='%s')",
+							snap.crafterClass.c_str(), m_clipboard.buildingClass.c_str());
+					else
+					{
+						LOG_INFO("WAILA Paste: applying '%s' to %s", m_clipboard.recipeDisplayName.c_str(), snap.crafterClass.c_str());
+						ApplyRecipeToCrafter(snap.actorPtr, m_clipboard);
+						if (m_showActionToast)
+							ShowToast(m_clipboard.recipeDisplayName + " Pasted To " + snap.crafterClass + "!");
+					}
+				}
+			}
+		}
+
+		if (m_lockPending.exchange(false))
+		{
+			LOG_INFO("WAILA Lock: action triggered, raycasting at distance %.1f", m_actionRaycastDistance);
+			Waila::Core::RaycastHit ah;
+			bool bActionHit = m_raycaster.PerformRaycast(m_actionRaycastDistance, ah);
+			LOG_INFO("WAILA Lock: raycast hit=%d actor=%p", bActionHit, bActionHit ? ah.actor : nullptr);
+
+			Waila::CrafterInfo snap;
+			if (bActionHit && ah.actor)
+			{
+				bool isCrafter = Waila::CrafterDetector::IsCrafter(ah.actor);
+				LOG_INFO("WAILA Lock: IsCrafter=%d", isCrafter);
+				if (isCrafter)
+					Waila::CrafterDetector::GetCrafterInfo(ah.actor, snap);
+			}
+
+			LOG_INFO("WAILA Lock: snap.IsValid=%d recipe='%s' recipeDataPtr=%p",
+				snap.IsValid(), snap.currentRecipe.c_str(), snap.recipeDataPtr);
+
+			if (snap.IsValid() && snap.currentRecipe != "(idle)" && snap.recipeDataPtr)
+			{
+				m_lockRecipe.buildingClass     = snap.crafterClass;
+				m_lockRecipe.recipeDisplayName = snap.currentRecipeDisplayName;
+				m_lockRecipe.recipeData        = snap.recipeDataPtr;
+				m_lockActive                   = true;
+				m_pastedActors.clear();
+				SetLockWidgetVisible(true);
+				if (m_showActionToast)
+					ShowToast(snap.currentRecipeDisplayName + " Locked From " + snap.crafterClass + "!");
+				LOG_INFO("WAILA Lock: locked '%s' for %s", snap.currentRecipeDisplayName.c_str(), snap.crafterClass.c_str());
+			}
+			else
+			{
+				LOG_INFO("WAILA Lock: not looking at a crafter with a recipe set");
+			}
+		}
+
 		// Lock-mode autopaste: find any new idle crafter of the locked type not yet pasted
 		if (m_lockActive)
 		{
@@ -451,6 +613,18 @@ namespace Waila::UI
 					ApplyRecipeToCrafter(a, m_lockRecipe);
 					m_pastedActors.insert(static_cast<void*>(a));
 				}
+			}
+		}
+
+		// Toast countdown
+		if (m_toastTimeRemaining > 0.f)
+		{
+			m_toastTimeRemaining -= deltaSeconds;
+			if (m_toastTimeRemaining <= 0.f)
+			{
+				m_toastTimeRemaining = 0.f;
+				if (m_self->hooks && m_self->hooks->UI && m_toastWidgetHandle)
+					m_self->hooks->UI->SetWidgetVisible(m_toastWidgetHandle, false);
 			}
 		}
 

@@ -14,6 +14,7 @@
 #include <atomic>
 #include <mutex>
 #include <unordered_set>
+#include <string>
 
 // Forward declarations to avoid including heavy SDK headers here
 namespace SDK
@@ -54,6 +55,10 @@ namespace Waila::UI
 		// ── Lock-mode banner widget ──────────────────────────────────────────
 		void RenderLockWidget(IModLoaderImGui* imgui);
 
+		// ── Toast notification widget ────────────────────────────────────────
+		void RenderToastWidget(IModLoaderImGui* imgui);
+		void ShowToast(const std::string& message);
+
 		// ── Recipe clipboard / lock ──────────────────────────────────────────
 		void ApplyRecipeToCrafter(SDK::AActor* actor, const Waila::RecipeClipboard& clip);
 		void SetLockWidgetVisible(bool visible);
@@ -62,15 +67,20 @@ namespace Waila::UI
 		static void OnTick(float deltaSeconds);
 		static void OnRenderWidget(IModLoaderImGui* imgui);
 		static void OnRenderLockWidget(IModLoaderImGui* imgui);
+		static void OnRenderToastWidget(IModLoaderImGui* imgui);
 
 		// Hotkey callbacks — fired on the input thread, must be fast and lock-free
 		static void OnCopyKey(EModKey key, EModKeyEvent event);
 		static void OnPasteKey(EModKey key, EModKeyEvent event);
 		static void OnLockKey(EModKey key, EModKeyEvent event);
 
+		static void OnConfigChanged(const char* section, const char* key, const char* newValue);
+
 		// ── State ────────────────────────────────────────────────────────────
 		IPluginSelf* m_self = nullptr;
 		float m_maxDistance = 256.f;
+		float m_actionRaycastDistance = 3000.f;
+		bool  m_showActionToast       = true;
 
 		WidgetHandle     m_widgetHandle     = nullptr;
 		bool             m_widgetVisible    = false;
@@ -79,6 +89,12 @@ namespace Waila::UI
 		WidgetHandle     m_lockWidgetHandle  = nullptr;
 		bool             m_lockWidgetVisible = false;
 		PluginWidgetDesc m_lockWidgetDesc    = {};
+
+		WidgetHandle      m_toastWidgetHandle  = nullptr;
+		PluginWidgetDesc  m_toastWidgetDesc    = {};
+		PluginWindowHints m_toastWindowHints   = {};
+		std::string       m_toastMessage;
+		float             m_toastTimeRemaining = 0.f;
 
 		Waila::Core::WailaRaycastSystem m_raycaster;
 
@@ -112,6 +128,11 @@ namespace Waila::UI
 		Waila::RecipeClipboard              m_lockRecipe;
 		// Tracks actors already pasted to in lock mode so we only paste each new building once
 		std::unordered_set<void*>           m_pastedActors;
+
+		// Pending actions set by input-thread key handlers, consumed by Tick (game thread)
+		std::atomic<bool> m_copyPending  { false };
+		std::atomic<bool> m_pastePending { false };
+		std::atomic<bool> m_lockPending  { false };
 
 		// Singleton pointer used by static callbacks
 		static WailaUIManager* s_instance;
