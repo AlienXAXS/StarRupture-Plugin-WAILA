@@ -174,6 +174,11 @@ namespace Waila::UI
 				m_toastWindowHints.pivot_y  = 0.5f;
 				m_toastWindowHints.size_cond = 0;
 				m_toastWindowHints.pos_cond  = 0;  // Always re-apply position
+				m_toastWindowHints.extra_window_flags = PluginWindowFlags_NoTitleBar    |
+				                                        PluginWindowFlags_NoResize      |
+				                                        PluginWindowFlags_NoMove        |
+				                                        PluginWindowFlags_NoSavedSettings |
+				                                        PluginWindowFlags_NoMouseInputs;
 
 				m_toastWidgetDesc.name        = "WAILA Toast";
 				m_toastWidgetDesc.renderFn    = &WailaUIManager::OnRenderToastWidget;
