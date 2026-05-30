@@ -21,7 +21,8 @@ static PluginInfo s_pluginInfo = {
 	MODLOADER_BUILD_TAG,
 	"AlienX",
 	"Minecraft style What Am I Looking At?",
-	PLUGIN_INTERFACE_VERSION
+	PLUGIN_INTERFACE_VERSION,
+	PLUGIN_TARGET_CLIENT
 };
 
 // Global UI manager instance
