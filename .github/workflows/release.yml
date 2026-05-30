@@ -23,6 +23,19 @@ jobs:
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
+      - name: Checkout Plugin SDK
+        uses: actions/checkout@v4
+        with:
+          repository: AlienXAXS/StarRupture-Plugin-SDK
+          path: plugin-sdk
+
+      - name: Checkout Game SDK
+        uses: actions/checkout@v4
+        with:
+          repository: AlienXAXS/StarRupture-Game-SDK
+          path: game-sdk
+          submodules: true
+
       - name: Generate release tag
         id: tag
         shell: pwsh
@@ -72,6 +85,8 @@ jobs:
             /p:Configuration="Client Release" `
             /p:Platform=x64 `
             /p:PostBuildEventUseInBuild=false `
+            /p:GameSDKRoot="${{ github.workspace }}\game-sdk" `
+            /p:PluginSDKInclude="${{ github.workspace }}\plugin-sdk\include" `
             /m /v:minimal
 
       - name: Package ZIPs
