@@ -74,13 +74,6 @@ jobs:
             /p:PostBuildEventUseInBuild=false `
             /m /v:minimal
 
-      - name: Build Server Release
-        run: |
-          msbuild "StarRupture-Plugin-Waila.sln" `
-            /p:Configuration="Server Release" `
-            /p:Platform=x64 `
-            /p:PostBuildEventUseInBuild=false `
-            /m /v:minimal
       - name: Package ZIPs
         shell: pwsh
         run: |
@@ -90,10 +83,6 @@ jobs:
           New-Item -ItemType Directory -Force $stagingClient | Out-Null
           Copy-Item "build\Client Release\Plugins\Waila.dll" "$stagingClient\Waila.dll"
           Compress-Archive -Path "$stagingClient\*" -DestinationPath "$ws\WAILA-Client-$tag.zip"
-          $stagingServer = "$ws\staging\Server"
-          New-Item -ItemType Directory -Force $stagingServer | Out-Null
-          Copy-Item "build\Server Release\Plugins\Waila.dll" "$stagingServer\Waila.dll"
-          Compress-Archive -Path "$stagingServer\*" -DestinationPath "$ws\WAILA-Server-$tag.zip"
           Write-Host "Packaged WAILA"
 
       - name: Create GitHub Release
@@ -105,7 +94,6 @@ jobs:
           $ws  = $env:GITHUB_WORKSPACE
           gh release create $tag `
             "$ws\WAILA-Client-$tag.zip" `
-            "$ws\WAILA-Server-$tag.zip" `
             --title "WAILA $tag" `
             --generate-notes
 
@@ -120,13 +108,3 @@ jobs:
           description: "Changelog: https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag.outputs.TAG }}"
           version: ${{ steps.tag.outputs.NEXUS_VERSION }}
 
-      - name: Upload Server build to Nexus Mods
-        uses: Nexus-Mods/upload-action@main
-        with:
-          api_key: ${{ secrets.NEXUS_APIKEY }}
-          file_group_id: ${{ secrets.NEXUS_SERVER_GROUP_ID }}
-          filename: ${{ github.workspace }}\WAILA-Server-${{ steps.tag.outputs.TAG }}.zip
-          archive_existing_file: true
-          display_name: "WAILA Server ${{ steps.tag.outputs.TAG }}"
-          description: "Changelog: https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag.outputs.TAG }}"
-          version: ${{ steps.tag.outputs.NEXUS_VERSION }}
