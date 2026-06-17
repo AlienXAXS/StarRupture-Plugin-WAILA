@@ -213,11 +213,14 @@ jobs:
         uses: Nexus-Mods/upload-action@main
         with:
           api_key: ${{ secrets.NEXUS_APIKEY }}
-          file_group_id: ${{ secrets.NEXUS_CLIENT_GROUP_ID }}
+          file_id: ${{ secrets.NEXUS_CLIENT_GROUP_ID }}
           filename: ${{ github.workspace }}\WAILA-Client-${{ steps.tag.outputs.TAG }}.zip
-          archive_existing_file: true
+          archive_existing_version: true
           allow_mod_manager_download: false
           display_name: "WAILA Client ${{ steps.tag.outputs.TAG }}"
           description: "Changelog: https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag.outputs.TAG }}"
           version: ${{ steps.tag.outputs.NEXUS_VERSION }}
+
+
+# Unexpected input(s) 'file_group_id', 'archive_existing_file', valid inputs are ['api_key', 'file_id', 'filename', 'description', 'version', 'category', 'display_name', 'archive_existing_version', 'primary_mod_manager_download', 'allow_mod_manager_download', 'show_requirements_pop_up']
 
