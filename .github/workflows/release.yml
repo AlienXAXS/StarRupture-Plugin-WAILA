@@ -220,7 +220,3 @@ jobs:
           display_name: "WAILA Client ${{ steps.tag.outputs.TAG }}"
           description: "Changelog: https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag.outputs.TAG }}"
           version: ${{ steps.tag.outputs.NEXUS_VERSION }}
-
-
-# Unexpected input(s) 'file_group_id', 'archive_existing_file', valid inputs are ['api_key', 'file_id', 'filename', 'description', 'version', 'category', 'display_name', 'archive_existing_version', 'primary_mod_manager_download', 'allow_mod_manager_download', 'show_requirements_pop_up']
-
