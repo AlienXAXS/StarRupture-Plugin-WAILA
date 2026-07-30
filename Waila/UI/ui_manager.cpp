@@ -194,7 +194,7 @@ namespace Waila::UI
 			// Listen for live config changes
 			if (m_self->hooks->UI)
 			{
-				m_self->hooks->UI->RegisterOnConfigChanged(&OnConfigChanged);
+				m_self->hooks->UI->RegisterOnConfigChanged(m_self, &OnConfigChanged);
 			}
 
 			// Register hotkeys
@@ -263,7 +263,7 @@ namespace Waila::UI
 
 			if (m_self->hooks->UI)
 			{
-				m_self->hooks->UI->UnregisterOnConfigChanged(&OnConfigChanged);
+				m_self->hooks->UI->UnregisterOnConfigChanged(m_self, &OnConfigChanged);
 			}
 		}
 
