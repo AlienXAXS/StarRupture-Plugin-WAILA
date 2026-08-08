@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Client Debug|x64">
@@ -311,6 +311,11 @@
     <ClInclude Include="cargo_sender_detector.h" />
     <ClInclude Include="cargo_receiver_detector.h" />
     <ClInclude Include="UI\ui_manager.h" />
+    <ClInclude Include="UI\ui_theme.h" />
+    <ClInclude Include="UI\ui_draw.h" />
+    <ClInclude Include="UI\icon_cache.h" />
+    <ClInclude Include="UI\card_model.h" />
+    <ClInclude Include="UI\waila_card.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(StarRuptureSDKSourceDir)Basic.cpp" />
@@ -332,6 +337,11 @@
     <ClCompile Include="cargo_sender_detector.cpp" />
     <ClCompile Include="cargo_receiver_detector.cpp" />
     <ClCompile Include="UI\ui_manager.cpp" />
+    <ClCompile Include="UI\ui_theme.cpp" />
+    <ClCompile Include="UI\ui_draw.cpp" />
+    <ClCompile Include="UI\icon_cache.cpp" />
+    <ClCompile Include="UI\card_model.cpp" />
+    <ClCompile Include="UI\waila_card.cpp" />
     <ClCompile Include="waila_functions.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -46,6 +46,31 @@ namespace WailaPluginConfig
 			"Whether to render building descriptions in the WAILA widget"
 		},
 		{
+			"WAILA",
+			"Scale",
+			ConfigValueType::Float,
+			"1.0",
+			"Size of the WAILA card. 1.0 is the design size; raise it for 4K displays",
+			0.5f,
+			3.0f
+		},
+		{
+			"WAILA",
+			"Opacity",
+			ConfigValueType::Float,
+			"0.92",
+			"Opacity of the WAILA card background",
+			0.30f,
+			1.0f
+		},
+		{
+			"WAILA",
+			"Lock Overlay",
+			ConfigValueType::Boolean,
+			"false",
+			"Pin the card in place. Leave off to drag it with left click; its position is remembered either way"
+		},
+		{
 			"Hotkeys",
 			"Copy Recipe Key",
 			ConfigValueType::Keybind,
@@ -112,6 +137,21 @@ namespace WailaPluginConfig
 		static bool ShouldRenderDescriptions()
 		{
 			return s_self ? s_self->config->ReadBool(s_self, "WAILA", "Render Building Descriptions", true) : true;
+		}
+
+		static float GetScale()
+		{
+			return s_self ? s_self->config->ReadFloat(s_self, "WAILA", "Scale", 1.0f) : 1.0f;
+		}
+
+		static float GetOpacity()
+		{
+			return s_self ? s_self->config->ReadFloat(s_self, "WAILA", "Opacity", 0.92f) : 0.92f;
+		}
+
+		static bool GetLockOverlay()
+		{
+			return s_self ? s_self->config->ReadBool(s_self, "WAILA", "Lock Overlay", false) : false;
 		}
 
 		static std::string GetCopyKey()

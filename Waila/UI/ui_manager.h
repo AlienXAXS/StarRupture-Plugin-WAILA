@@ -10,6 +10,7 @@
 #include "cooler_passive_detector.h"
 #include "cargo_sender_detector.h"
 #include "cargo_receiver_detector.h"
+#include "UI/card_model.h"
 #include "Engine_structs.hpp"
 #include <atomic>
 #include <mutex>
@@ -42,15 +43,18 @@ namespace Waila::UI
 		void Tick(float deltaSeconds);
 
 	private:
-		// ── WAILA info widget ────────────────────────────────────────────────
+		// ── WAILA info card ──────────────────────────────────────────────────
 		void RenderWidget(IModLoaderImGui* imgui);
-		void RenderCrafterInfo(IModLoaderImGui* imgui, const Waila::CrafterInfo& info);
-		void RenderStorageInfo(IModLoaderImGui* imgui, const Waila::StorageInfo& info);
-		void RenderPowerInfo(IModLoaderImGui* imgui, const Waila::PowerInfo& info);
-		void RenderCoolerActiveInfo(IModLoaderImGui* imgui, const Waila::CoolerActiveInfo& info);
-		void RenderCoolerPassiveInfo(IModLoaderImGui* imgui, const Waila::CoolerPassiveInfo& info);
-		void RenderCargoSenderInfo(IModLoaderImGui* imgui, const Waila::CargoSenderInfo& info);
-		void RenderCargoReceiverInfo(IModLoaderImGui* imgui, const Waila::CargoReceiverInfo& info);
+
+		// The card's window flags are baked in when the widget is created, so a
+		// lock/unlock has to rebuild it.
+		void RegisterMainWidget();
+		void UnregisterMainWidget();
+		void UpdateWindowHints(float width, float height);
+
+		// Full read from the ini, for startup only.
+		void ApplySettings();
+		void ClampSettings();
 
 		// ── Lock-mode banner widget ──────────────────────────────────────────
 		void RenderLockWidget(IModLoaderImGui* imgui);
@@ -82,9 +86,17 @@ namespace Waila::UI
 		float m_actionRaycastDistance = 3000.f;
 		bool  m_showActionToast       = true;
 
-		WidgetHandle     m_widgetHandle     = nullptr;
-		bool             m_widgetVisible    = false;
-		PluginWidgetDesc m_widgetDesc       = {};
+		// Card presentation, refreshed from config on change.
+		float m_scale            = 1.f;
+		float m_opacity          = 0.92f;
+		bool  m_lockOverlay      = false;
+		bool  m_showDescriptions = true;
+
+		WidgetHandle      m_widgetHandle     = nullptr;
+		bool              m_widgetVisible    = false;
+		PluginWidgetDesc  m_widgetDesc       = {};
+		PluginWindowHints m_widgetHints      = {};
+		int               m_appliedFlags     = -1;
 
 		WidgetHandle     m_lockWidgetHandle  = nullptr;
 		bool             m_lockWidgetVisible = false;
@@ -98,15 +110,11 @@ namespace Waila::UI
 
 		Waila::Core::WailaRaycastSystem m_raycaster;
 
-		// Written by Tick (game thread), read by RenderWidget (render thread).
-		std::mutex               m_infoMutex;
-		Waila::CrafterInfo       m_pendingInfo;
-		Waila::StorageInfo       m_pendingStorageInfo;
-		Waila::PowerInfo         m_pendingPowerInfo;
-		Waila::CoolerActiveInfo  m_pendingCoolerActiveInfo;
-		Waila::CoolerPassiveInfo m_pendingCoolerPassiveInfo;
-		Waila::CargoSenderInfo   m_pendingCargoSenderInfo;
-		Waila::CargoReceiverInfo m_pendingCargoReceiverInfo;
+		// Built by Tick (game thread), consumed by RenderWidget (render thread).
+		// The model holds no engine pointers, so the render side never touches a
+		// UObject that may have gone away since the raycast.
+		std::mutex           m_infoMutex;
+		Waila::UI::CardModel m_pendingCard;
 
 		// Last-hit actor & recipe pointer for hotkey callbacks (under m_infoMutex)
 		SDK::AActor*            m_lastHitActor   = nullptr;

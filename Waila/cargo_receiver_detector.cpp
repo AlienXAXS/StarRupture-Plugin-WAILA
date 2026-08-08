@@ -29,6 +29,8 @@ namespace Waila
 			? static_cast<UCrBuildingData*>(building->PlacementData)
 			: nullptr;
 
+		outInfo.buildingData = buildingData;
+
 		if (buildingData)
 		{
 			outInfo.buildingName = UKismetTextLibrary::Conv_TextToString(buildingData->BuildingName).ToString();
@@ -57,19 +59,27 @@ namespace Waila
 				FCrItemsStorageContainer* container = fnGetContainer(itemStorage, world);
 				if (container)
 				{
+					// storedItems is deduplicated by item type, so its size counts
+					// the *kinds* held. Occupied slots are counted as we go.
 					std::unordered_map<std::string, size_t> itemIndexMap;
+					int32_t occupiedSlots = 0;
+
 					for (int i = 0; i < container->Items.Num(); ++i)
 					{
 						const FCrStorageItem& slot = container->Items[i];
 						if (slot.bIsDisabled || slot.Item.Count <= 0)
 							continue;
 
+						++occupiedSlots;
+
 						std::string uniqueName;
 						std::string displayName;
+						UAuItemDataBase* itemData = nullptr;
 						if (slot.Item.ItemDataBase && UKismetSystemLibrary::IsValid(slot.Item.ItemDataBase))
 						{
-							uniqueName  = slot.Item.ItemDataBase->UniqueItemName.ToString();
-							displayName = UKismetTextLibrary::Conv_TextToString(slot.Item.ItemDataBase->ItemName).ToString();
+							itemData    = slot.Item.ItemDataBase;
+							uniqueName  = itemData->UniqueItemName.ToString();
+							displayName = UKismetTextLibrary::Conv_TextToString(itemData->ItemName).ToString();
 						}
 
 						auto it = itemIndexMap.find(uniqueName);
@@ -84,10 +94,11 @@ namespace Waila
 							entry.uniqueName  = uniqueName;
 							entry.displayName = displayName;
 							entry.count       = slot.Item.Count;
+							entry.itemData    = itemData;
 							outInfo.storedItems.push_back(entry);
 						}
 					}
-					outInfo.usedSlots = static_cast<int32_t>(outInfo.storedItems.size());
+					outInfo.usedSlots = occupiedSlots;
 				}
 			}
 

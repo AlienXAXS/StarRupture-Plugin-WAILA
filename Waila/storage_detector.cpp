@@ -30,6 +30,8 @@ namespace Waila
 			? static_cast<UCrBuildingData*>(building->PlacementData)
 			: nullptr;
 
+		outInfo.buildingData = buildingData;
+
 		if (buildingData)
 		{
 			outInfo.buildingName = UKismetTextLibrary::Conv_TextToString(buildingData->BuildingName).ToString();
@@ -64,19 +66,28 @@ namespace Waila
 					FCrItemsStorageContainer* container = fnGetContainer(itemStorage, world);
 					if (container)
 					{
+						// storedItems is deduplicated by item type, so its size counts
+						// the *kinds* held — 1 for a depot full of a single item.
+						// Occupied slots have to be counted as the slots go by.
 						std::unordered_map<std::string, size_t> itemIndexMap;
+						int32_t occupiedSlots = 0;
+
 						for (int i = 0; i < container->Items.Num(); ++i)
 						{
 							const FCrStorageItem& slot = container->Items[i];
 							if (slot.bIsDisabled || slot.Item.Count <= 0)
 								continue;
 
+							++occupiedSlots;
+
 							std::string uniqueName;
 							std::string displayName;
+							UAuItemDataBase* itemData = nullptr;
 							if (slot.Item.ItemDataBase && UKismetSystemLibrary::IsValid(slot.Item.ItemDataBase))
 							{
-								uniqueName  = slot.Item.ItemDataBase->UniqueItemName.ToString();
-								displayName = UKismetTextLibrary::Conv_TextToString(slot.Item.ItemDataBase->ItemName).ToString();
+								itemData    = slot.Item.ItemDataBase;
+								uniqueName  = itemData->UniqueItemName.ToString();
+								displayName = UKismetTextLibrary::Conv_TextToString(itemData->ItemName).ToString();
 							}
 
 							auto it = itemIndexMap.find(uniqueName);
@@ -91,19 +102,25 @@ namespace Waila
 								entry.uniqueName  = uniqueName;
 								entry.displayName = displayName;
 								entry.count       = slot.Item.Count;
+								entry.itemData    = itemData;
 								outInfo.storedItems.push_back(entry);
 							}
 						}
-						outInfo.usedSlots = static_cast<int32_t>(outInfo.storedItems.size());
+						outInfo.usedSlots = occupiedSlots;
 					}
 				}
 			}
 		}
 
-		// Capacity from the main storage component
-		if (building->ItemStorage)
+		// Capacity has to come from the component the slots were counted in, or
+		// used/total would be a ratio of two different grids.
+		UCrBuildingItemStorageComponent* capacitySource =
+			mainStorage ? static_cast<UCrBuildingItemStorageComponent*>(mainStorage)
+			            : building->ItemStorage;
+
+		if (capacitySource)
 		{
-			outInfo.maxCapacity = building->ItemStorage->GridColumns * building->ItemStorage->GridRows;
+			outInfo.maxCapacity = capacitySource->GridColumns * capacitySource->GridRows;
 		}
 
 		return true;

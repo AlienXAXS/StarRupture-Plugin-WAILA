@@ -4,12 +4,83 @@
 #include "Chimera_classes.hpp"
 #include "Chimera_structs.hpp"
 #include "AuCrafting_classes.hpp"
+#include "AuCrafting_structs.hpp"
 #include "AuItems_classes.hpp"
+
+#include <string>
+#include <unordered_map>
 
 using namespace SDK;
 
 namespace Waila
 {
+	namespace
+	{
+		// A recipe stores ingredients as item *classes*; everything worth showing
+		// (icon, display name, unique name) lives on the class default object.
+		UAuItemDataBase* ItemDefaultsOf(UClass* itemClass)
+		{
+			if (!itemClass)
+				return nullptr;
+
+			UObject* cdo = itemClass->ClassDefaultObject;
+			if (!cdo)
+				return nullptr;
+
+			bool isItem = false;
+			try { isItem = cdo->IsA(UAuItemDataBase::StaticClass()); }
+			catch (...) { return nullptr; }
+
+			return isItem ? static_cast<UAuItemDataBase*>(cdo) : nullptr;
+		}
+
+		void FillEntry(RecipeItemEntry& entry, UClass* itemClass, int32_t count)
+		{
+			entry.itemClass = itemClass;
+			entry.need      = count;
+			entry.itemData  = ItemDefaultsOf(itemClass);
+
+			if (entry.itemData)
+				entry.displayName = UKismetTextLibrary::Conv_TextToString(entry.itemData->ItemName).ToString();
+		}
+
+		// Counts what is actually sitting in the crafter's input store, keyed by
+		// the item's unique name so ingredients can be matched against it.
+		// Returns false when the store could not be read, which is the difference
+		// between "0 of these" and "we don't know".
+		bool ReadInputStock(ACrBuildingActorBase* building,
+		                    std::unordered_map<std::string, int32_t>& outStock)
+		{
+			if (!building || !building->InItemStorage)
+				return false;
+
+			auto fnGetContainer = Waila::Functions::GetStoredItemsContainerInternal();
+			if (!fnGetContainer)
+				return false;
+
+			UWorld* world = UWorld::GetWorld();
+			if (!world)
+				return false;
+
+			FCrItemsStorageContainer* container = fnGetContainer(building->InItemStorage, world);
+			if (!container)
+				return false;
+
+			for (int i = 0; i < container->Items.Num(); ++i)
+			{
+				const FCrStorageItem& slot = container->Items[i];
+				if (slot.bIsDisabled || slot.Item.Count <= 0)
+					continue;
+				if (!slot.Item.ItemDataBase || !UKismetSystemLibrary::IsValid(slot.Item.ItemDataBase))
+					continue;
+
+				outStock[slot.Item.ItemDataBase->UniqueItemName.ToString()] += slot.Item.Count;
+			}
+
+			return true;
+		}
+	}
+
 	bool CrafterDetector::IsCrafter(AActor* actor)
 	{
 		if (!actor || !UKismetSystemLibrary::IsValid(actor))
@@ -34,6 +105,8 @@ namespace Waila
 		UCrBuildingData* buildingData = (building->PlacementData && building->PlacementData->IsA(UCrBuildingData::StaticClass()))
 			? static_cast<UCrBuildingData*>(building->PlacementData)
 			: nullptr;
+
+		outInfo.buildingData = buildingData;
 
 		if (buildingData)
 		{
@@ -74,6 +147,35 @@ namespace Waila
 				// Store typed recipe pointer for clipboard use (UCrItemRecipeData extends UAuItemRecipeData)
 				if (items[0].RecipeData->IsA(UCrItemRecipeData::StaticClass()))
 					outInfo.recipeDataPtr = static_cast<UCrItemRecipeData*>(items[0].RecipeData);
+
+				// Recipe inputs and output. The have-counts come from the crafter's
+				// own input store, so a starved machine can be spotted without
+				// opening it.
+				UAuItemRecipeData* recipe = items[0].RecipeData;
+
+				std::unordered_map<std::string, int32_t> stock;
+				const bool stockKnown = ReadInputStock(building, stock);
+
+				const TArray<FAuItemRecipeOrder>& needed = recipe->NeededResources;
+				outInfo.recipeInputs.reserve(static_cast<size_t>(needed.Num()));
+
+				for (int i = 0; i < needed.Num(); ++i)
+				{
+					RecipeItemEntry entry;
+					FillEntry(entry, needed[i].Item, needed[i].Count);
+					if (!entry.IsValid())
+						continue;
+
+					if (stockKnown && entry.itemData)
+					{
+						auto it = stock.find(entry.itemData->UniqueItemName.ToString());
+						entry.have = it != stock.end() ? it->second : 0;
+					}
+
+					outInfo.recipeInputs.push_back(std::move(entry));
+				}
+
+				FillEntry(outInfo.recipeOutput, recipe->OutputItem.Item, outInfo.recipeOutputCount);
 			}
 
 			// pattern: UCrCraftingComponent::GetCraftingFragment

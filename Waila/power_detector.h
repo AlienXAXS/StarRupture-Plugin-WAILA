@@ -3,7 +3,7 @@
 #include <string>
 #include <cstdint>
 
-namespace SDK { class AActor; }
+namespace SDK { class AActor; class UCrBuildingData; }
 
 namespace Waila
 {
@@ -19,6 +19,9 @@ namespace Waila
 
 		// 0=NotConnected, 1=Connected, 2=ConnectedAndOff
 		uint8_t gridConnectionStatus = 0;
+
+		// Building definition the card's icon comes from.
+		SDK::UCrBuildingData* buildingData = nullptr;
 
 		bool IsValid() const { return !buildingName.empty(); }
 	};

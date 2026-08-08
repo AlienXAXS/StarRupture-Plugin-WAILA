@@ -5,7 +5,7 @@
 #include <cstdint>
 #include "storage_detector.h"
 
-namespace SDK { class AActor; }
+namespace SDK { class AActor; class UCrBuildingData; }
 
 namespace Waila
 {
@@ -16,6 +16,9 @@ namespace Waila
 		int32_t     maxCapacity = 0;
 		int32_t     usedSlots   = 0;
 		std::vector<StoredItemEntry> storedItems;
+
+		// Building definition the card's icon comes from.
+		SDK::UCrBuildingData* buildingData = nullptr;
 
 		bool IsValid() const { return !buildingName.empty(); }
 	};

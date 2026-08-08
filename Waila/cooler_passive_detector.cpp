@@ -33,6 +33,8 @@ namespace Waila
 			? static_cast<UCrBuildingData*>(building->PlacementData)
 			: nullptr;
 
+		outInfo.buildingData = buildingData;
+
 		if (buildingData)
 		{
 			outInfo.buildingName = UKismetTextLibrary::Conv_TextToString(buildingData->BuildingName).ToString();

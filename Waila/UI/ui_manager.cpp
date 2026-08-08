@@ -2,6 +2,10 @@
 #include "plugin_helpers.h"
 #include "plugin_config.h"
 #include "waila_functions.h"
+#include "UI/icon_cache.h"
+#include "UI/ui_draw.h"
+#include "UI/ui_theme.h"
+#include "UI/waila_card.h"
 #include "Engine_classes.hpp"
 #include "Engine_structs.hpp"
 #include "Chimera_classes.hpp"
@@ -102,12 +106,10 @@ namespace Waila::UI
 			return;
 		}
 
-		LOG_DEBUG("WailaUIManager::Initialize: reading distances from config");
-		m_maxDistance           = WailaPluginConfig::Config::GetMaxDistance();
-		m_actionRaycastDistance = WailaPluginConfig::Config::GetActionDistance();
-		m_showActionToast       = WailaPluginConfig::Config::GetShowActionToast();
-		LOG_DEBUG("WailaUIManager::Initialize: MaxDistance = %.1f, ActionDistance = %.1f, ShowActionToast = %d",
-			m_maxDistance, m_actionRaycastDistance, m_showActionToast);
+		LOG_DEBUG("WailaUIManager::Initialize: reading settings from config");
+		ApplySettings();
+		LOG_DEBUG("WailaUIManager::Initialize: MaxDistance = %.1f, ActionDistance = %.1f, ShowActionToast = %d, Scale = %.2f",
+			m_maxDistance, m_actionRaycastDistance, m_showActionToast, m_scale);
 
 		LOG_DEBUG("WailaUIManager::Initialize: complete");
 	}
@@ -143,16 +145,8 @@ namespace Waila::UI
 			// Register persistent HUD widget
 			if (m_self->hooks->UI)
 			{
-				m_widgetDesc.name = "WAILA";
-				m_widgetDesc.renderFn = &WailaUIManager::OnRenderWidget;
-
-				m_widgetHandle = m_self->hooks->UI->RegisterWidget(&m_widgetDesc);
-
-				if (m_widgetHandle)
-				{
-					m_self->hooks->UI->SetWidgetVisible(m_widgetHandle, false);
-					m_widgetVisible = false;
-				}
+				Waila::UI::Icons::Init();
+				RegisterMainWidget();
 
 				// Lock-mode banner widget (always visible while lock is active)
 				m_lockWidgetDesc.name     = "WAILA Lock";
@@ -231,12 +225,16 @@ namespace Waila::UI
 
 			if (m_self->hooks->UI)
 			{
-				if (m_widgetHandle)
+				UnregisterMainWidget();
+
+				// The published model holds texture handles Icons is about to free,
+				// so it has to go first.
 				{
-					m_self->hooks->UI->UnregisterWidget(m_widgetHandle);
-					m_widgetHandle  = nullptr;
-					m_widgetVisible = false;
+					std::lock_guard<std::mutex> lock(m_infoMutex);
+					m_pendingCard.Clear();
 				}
+				Waila::UI::Icons::Shutdown();
+
 				if (m_lockWidgetHandle)
 				{
 					m_self->hooks->UI->UnregisterWidget(m_lockWidgetHandle);
@@ -280,6 +278,98 @@ namespace Waila::UI
 	// Helpers
 	// ---------------------------------------------------------------------------
 
+	void WailaUIManager::ClampSettings()
+	{
+		if (m_scale < 0.5f) m_scale = 0.5f;
+		if (m_scale > 3.0f) m_scale = 3.0f;
+		if (m_opacity < 0.1f) m_opacity = 0.1f;
+		if (m_opacity > 1.0f) m_opacity = 1.0f;
+	}
+
+	// Full read from the ini. Only for startup — live edits come through
+	// OnConfigChanged, which is given the new value directly.
+	void WailaUIManager::ApplySettings()
+	{
+		m_maxDistance           = WailaPluginConfig::Config::GetMaxDistance();
+		m_actionRaycastDistance = WailaPluginConfig::Config::GetActionDistance();
+		m_showActionToast       = WailaPluginConfig::Config::GetShowActionToast();
+		m_scale                 = WailaPluginConfig::Config::GetScale();
+		m_opacity               = WailaPluginConfig::Config::GetOpacity();
+		m_lockOverlay           = WailaPluginConfig::Config::GetLockOverlay();
+		m_showDescriptions      = WailaPluginConfig::Config::ShouldRenderDescriptions();
+
+		ClampSettings();
+		Card::SetShowDescriptions(m_showDescriptions);
+	}
+
+	void WailaUIManager::UpdateWindowHints(float width, float height)
+	{
+		m_widgetHints.width   = width;
+		m_widgetHints.height  = height;
+		m_widgetHints.pos_x   = -1.f;   // let the player place it
+		m_widgetHints.pos_y   = -1.f;
+		m_widgetHints.pivot_x = 0.f;
+		m_widgetHints.pivot_y = 0.f;
+		m_widgetHints.size_cond = 0;    // Always — a scale change lands immediately
+		m_widgetHints.pos_cond  = 1;    // FirstUseEver
+
+		// NoBackground matters: the card is drawn by hand, so ImGui's own window
+		// frame would sit around it as a second, larger box.
+		//
+		// No NoSavedSettings, and pos_x/pos_y stay negative so the ModLoader never
+		// calls SetNextWindowPos: between them, wherever the player drags the card
+		// is what ImGui writes to its ini and restores next launch.
+		int flags = PluginWindowFlags_NoTitleBar
+		          | PluginWindowFlags_NoResize
+		          | PluginWindowFlags_NoScrollbar
+		          | PluginWindowFlags_NoBackground;
+
+		// Unlocked leaves ImGui's move handling on, so the card can be dragged by
+		// its body whenever the ModLoader UI (F2) has a cursor up. The render
+		// callback reserves the content region with an ID-less Dummy, which keeps
+		// every pixel of the card a drag handle rather than a widget.
+		if (m_lockOverlay)
+			flags |= PluginWindowFlags_NoMove | PluginWindowFlags_NoMouseInputs;
+
+		m_widgetHints.extra_window_flags = flags;
+	}
+
+	void WailaUIManager::RegisterMainWidget()
+	{
+		if (!m_self || !m_self->hooks || !m_self->hooks->UI || m_widgetHandle)
+			return;
+
+		// Seeded with the smallest card so the first frame is never over-sized;
+		// Tick replaces this the moment there is something to show.
+		UpdateWindowHints(300.f * m_scale, 110.f * m_scale);
+		m_appliedFlags = m_widgetHints.extra_window_flags;
+
+		m_widgetDesc.name        = "WAILA";
+		m_widgetDesc.renderFn    = &WailaUIManager::OnRenderWidget;
+		m_widgetDesc.windowHints = &m_widgetHints;
+
+		m_widgetHandle = m_self->hooks->UI->RegisterWidget(&m_widgetDesc);
+		if (!m_widgetHandle)
+		{
+			LOG_ERROR("WailaUIManager: failed to register the WAILA card widget");
+			return;
+		}
+
+		m_self->hooks->UI->SetWidgetVisible(m_widgetHandle, false);
+		m_widgetVisible = false;
+	}
+
+	void WailaUIManager::UnregisterMainWidget()
+	{
+		if (!m_self || !m_self->hooks || !m_self->hooks->UI || !m_widgetHandle)
+			return;
+
+		m_self->hooks->UI->UnregisterWidget(m_widgetHandle);
+		m_widgetHandle  = nullptr;
+		m_widgetVisible = false;
+		m_appliedFlags  = -1;
+	}
+
 	void WailaUIManager::SetLockWidgetVisible(bool visible)
 	{
 		if (!m_self || !m_self->hooks || !m_self->hooks->UI || !m_lockWidgetHandle) return;
@@ -290,14 +380,48 @@ namespace Waila::UI
 		}
 	}
 
-	void WailaUIManager::OnConfigChanged(const char* section, const char* /*key*/, const char* /*newValue*/)
+	namespace
 	{
-		if (!s_instance || strcmp(section, "WAILA") != 0) return;
-		s_instance->m_maxDistance           = WailaPluginConfig::Config::GetMaxDistance();
-		s_instance->m_actionRaycastDistance = WailaPluginConfig::Config::GetActionDistance();
-		s_instance->m_showActionToast       = WailaPluginConfig::Config::GetShowActionToast();
-		LOG_INFO("WAILA: config updated — MaxDistance=%.1f ActionDistance=%.1f",
-			s_instance->m_maxDistance, s_instance->m_actionRaycastDistance);
+		bool ParseConfigBool(const char* value)
+		{
+			return value && (_stricmp(value, "true") == 0 ||
+			                 _stricmp(value, "yes")  == 0 ||
+			                 strcmp(value, "1") == 0);
+		}
+	}
+
+	void WailaUIManager::OnConfigChanged(const char* section, const char* key, const char* newValue)
+	{
+		if (!s_instance || !section || !key || !newValue) return;
+		if (strcmp(section, "WAILA") != 0) return;
+
+		// The ModLoader fires this the moment the value changes in memory and only
+		// writes the ini when the widget is released, so re-reading the config here
+		// would hand back the *previous* setting — the edit would appear to take
+		// two changes to land. Take the value from the callback instead.
+		if      (strcmp(key, "Max Distance")    == 0) s_instance->m_maxDistance           = strtof(newValue, nullptr);
+		else if (strcmp(key, "Action Distance") == 0) s_instance->m_actionRaycastDistance = strtof(newValue, nullptr);
+		else if (strcmp(key, "Scale")           == 0) s_instance->m_scale                 = strtof(newValue, nullptr);
+		else if (strcmp(key, "Opacity")         == 0) s_instance->m_opacity               = strtof(newValue, nullptr);
+		else if (strcmp(key, "Show Action Toast") == 0) s_instance->m_showActionToast = ParseConfigBool(newValue);
+		else if (strcmp(key, "Lock Overlay")      == 0) s_instance->m_lockOverlay     = ParseConfigBool(newValue);
+		else if (strcmp(key, "Render Building Descriptions") == 0)
+		{
+			s_instance->m_showDescriptions = ParseConfigBool(newValue);
+			Card::SetShowDescriptions(s_instance->m_showDescriptions);
+		}
+		else return;   // not a setting that changes how the card looks
+
+		s_instance->ClampSettings();
+
+		// Size and colour changes land on their own; the lock flag is baked into
+		// the window at creation, so that one needs the widget rebuilt.
+		s_instance->UpdateWindowHints(s_instance->m_widgetHints.width, s_instance->m_widgetHints.height);
+		if (s_instance->m_widgetHints.extra_window_flags != s_instance->m_appliedFlags)
+		{
+			s_instance->UnregisterMainWidget();
+			s_instance->RegisterMainWidget();
+		}
 	}
 
 	void WailaUIManager::ShowToast(const std::string& message)
@@ -448,16 +572,35 @@ namespace Waila::UI
 			}
 		}
 
-		// Store the extracted info and debug ray under lock for the render thread and hotkey callbacks
+		// Retry any icons the GPU wasn't ready for on an earlier frame.
+		Waila::UI::Icons::Tick();
+
+		// Fold whatever was detected into the card model. This is the only place
+		// engine pointers are read for display — everything downstream of here is
+		// strings and texture handles, so the render thread can never chase an
+		// actor that has since been destroyed.
+		Waila::UI::CardModel card;
+		if (info.IsValid())                   Waila::UI::Card::FromCrafter(info, card);
+		else if (storageInfo.IsValid())       Waila::UI::Card::FromStorage(storageInfo, card);
+		else if (powerInfo.IsValid())         Waila::UI::Card::FromPower(powerInfo, card);
+		else if (coolerActiveInfo.IsValid())  Waila::UI::Card::FromCoolerActive(coolerActiveInfo, card);
+		else if (coolerPassiveInfo.IsValid()) Waila::UI::Card::FromCoolerPassive(coolerPassiveInfo, card);
+		else if (cargoSenderInfo.IsValid())   Waila::UI::Card::FromCargoSender(cargoSenderInfo, card);
+		else if (cargoReceiverInfo.IsValid()) Waila::UI::Card::FromCargoReceiver(cargoReceiverInfo, card);
+
+		// Size the window to exactly what the card will paint, at the current scale.
+		const bool hasCard = card.valid;
+		if (hasCard)
+		{
+			float cardW = 0.f, cardH = 0.f;
+			Waila::UI::Card::Measure(card, m_scale, cardW, cardH);
+			UpdateWindowHints(cardW, cardH);
+		}
+
+		// Store the card and debug ray under lock for the render thread and hotkey callbacks
 		{
 			std::lock_guard<std::mutex> lock(m_infoMutex);
-			m_pendingInfo        = info;
-			m_pendingStorageInfo = storageInfo;
-			m_pendingPowerInfo   = powerInfo;
-			m_pendingCoolerActiveInfo  = coolerActiveInfo;
-			m_pendingCoolerPassiveInfo = coolerPassiveInfo;
-			m_pendingCargoSenderInfo   = cargoSenderInfo;
-			m_pendingCargoReceiverInfo = cargoReceiverInfo;
+			m_pendingCard        = std::move(card);
 			m_debugRay.start     = hit.rayStart;
 			m_debugRay.end       = hit.rayEnd;
 			m_debugRay.hit       = bHit;
@@ -650,14 +793,12 @@ namespace Waila::UI
 			}
 		}
 
-		bool shouldBeVisible = info.IsValid() || storageInfo.IsValid() || powerInfo.IsValid() || coolerActiveInfo.IsValid() || coolerPassiveInfo.IsValid() || cargoSenderInfo.IsValid() || cargoReceiverInfo.IsValid();
-
 		if (m_self->hooks && m_self->hooks->UI && m_widgetHandle)
 		{
-			if (shouldBeVisible != m_widgetVisible)
+			if (hasCard != m_widgetVisible)
 			{
-				m_self->hooks->UI->SetWidgetVisible(m_widgetHandle, shouldBeVisible);
-				m_widgetVisible = shouldBeVisible;
+				m_self->hooks->UI->SetWidgetVisible(m_widgetHandle, hasCard);
+				m_widgetVisible = hasCard;
 			}
 		}
 	}
@@ -666,104 +807,42 @@ namespace Waila::UI
 	// Widget render — called by mod loader when widget is visible
 	// ---------------------------------------------------------------------------
 
-	static void RenderWrappedDesc(IModLoaderImGui* imgui, const std::string& desc, int maxLineLen = 30)
-	{
-		auto shouldRenderDesc = WailaPluginConfig::Config::ShouldRenderDescriptions();
-		if (!shouldRenderDesc)
-		{
-			return;
-		}
-
-		static const char* prefix = "Desc:     ";
-		static const char* indent = "          ";
-
-		char buf[512];
-		const char* text = desc.c_str();
-		size_t len = desc.size();
-		size_t pos = 0;
-		bool first = true;
-
-		while (pos < len)
-		{
-			size_t end = pos + maxLineLen;
-			if (end >= len)
-			{
-				end = len;
-			}
-			else
-			{
-				size_t space = end;
-				while (space < len && text[space] != ' ')
-					++space;
-				if (space - pos <= (size_t)(maxLineLen * 2))
-					end = space;
-			}
-
-			std::string chunk(text + pos, text + end);
-			snprintf(buf, sizeof(buf) - 1, "%s%s", first ? prefix : indent, chunk.c_str());
-			buf[sizeof(buf) - 1] = '\0';
-			imgui->Text(buf);
-
-			pos = end;
-			if (pos < len && text[pos] == ' ')
-				++pos;
-			first = false;
-		}
-	}
-
 	void WailaUIManager::RenderWidget(IModLoaderImGui* imgui)
 	{
-		try {
-
-			if (!imgui)
-			{
+		try
+		{
+			if (!imgui || !m_self)
 				return;
-			}
 
-			// Take a snapshot of pending info for all detector types
-			Waila::CrafterInfo  renderInfo;
-			Waila::StorageInfo  renderStorageInfo;
-			Waila::PowerInfo    renderPowerInfo;
-			Waila::CoolerActiveInfo  renderCoolerActiveInfo;
-			Waila::CoolerPassiveInfo renderCoolerPassiveInfo;
-			Waila::CargoSenderInfo   renderCargoSenderInfo;
-			Waila::CargoReceiverInfo renderCargoReceiverInfo;
+			Waila::UI::CardModel card;
 			{
 				std::lock_guard<std::mutex> lock(m_infoMutex);
-				renderInfo               = m_pendingInfo;
-				renderStorageInfo        = m_pendingStorageInfo;
-				renderPowerInfo          = m_pendingPowerInfo;
-				renderCoolerActiveInfo   = m_pendingCoolerActiveInfo;
-				renderCoolerPassiveInfo  = m_pendingCoolerPassiveInfo;
-				renderCargoSenderInfo    = m_pendingCargoSenderInfo;
-				renderCargoReceiverInfo  = m_pendingCargoReceiverInfo;
+				card = m_pendingCard;
 			}
 
-			// Don't render if disabled (world ended) or no valid data
-			if (!m_self || (!renderInfo.IsValid() && !renderStorageInfo.IsValid() && !renderPowerInfo.IsValid() && !renderCoolerActiveInfo.IsValid() && !renderCoolerPassiveInfo.IsValid() && !renderCargoSenderInfo.IsValid() && !renderCargoReceiverInfo.IsValid()))
-			{
+			if (!card.valid)
 				return;
-			}
 
-			imgui->TextColored(0.2f, 1.0f, 0.2f, 1.0f, "What Am I Looking At?");
-			imgui->Separator();
+			// Draw over the whole window rect rather than the padded content
+			// region -- with NoBackground the padding is just dead transparent
+			// margin, and the card should fill what the size hint asked for.
+			float wx = 0.f, wy = 0.f, ww = 0.f, wh = 0.f;
+			imgui->GetWindowPos(&wx, &wy);
+			imgui->GetWindowSize(&ww, &wh);
+			if (ww <= 1.f || wh <= 1.f)
+				return;
 
-			char buf[512];
+			// Still reserve the content region so ImGui keeps the window sized and
+			// leaves the body draggable when the overlay is unlocked.
+			float aw = 0.f, ah = 0.f;
+			imgui->GetContentRegionAvail(&aw, &ah);
+			if (aw > 0.f && ah > 0.f)
+				imgui->Dummy(aw, ah);
 
-			if (renderInfo.IsValid())
-				RenderCrafterInfo(imgui, renderInfo);
-			else if (renderStorageInfo.IsValid())
-				RenderStorageInfo(imgui, renderStorageInfo);
-			else if (renderPowerInfo.IsValid())
-				RenderPowerInfo(imgui, renderPowerInfo);
-			else if (renderCoolerActiveInfo.IsValid())
-				RenderCoolerActiveInfo(imgui, renderCoolerActiveInfo);
-			else if (renderCoolerPassiveInfo.IsValid())
-				RenderCoolerPassiveInfo(imgui, renderCoolerPassiveInfo);
-			else if (renderCargoSenderInfo.IsValid())
-				RenderCargoSenderInfo(imgui, renderCargoSenderInfo);
-			else if (renderCargoReceiverInfo.IsValid())
-				RenderCargoReceiverInfo(imgui, renderCargoReceiverInfo);
+			const Waila::UI::Palette pal = Waila::UI::Theme::Build(card.accent, m_opacity);
+			const Waila::UI::Rect    rect{ wx, wy, wx + ww, wy + wh };
+
+			Waila::UI::Card::Draw(imgui, imgui->GetWindowDrawList(), card, pal, m_scale, rect);
 		}
 		catch (const std::exception& e)
 		{
@@ -772,246 +851,6 @@ namespace Waila::UI
 		catch (...)
 		{
 			LOG_ERROR("WailaUIManager::RenderWidget: caught unknown exception");
-		}
-	}
-
-	void WailaUIManager::RenderCrafterInfo(IModLoaderImGui* imgui, const Waila::CrafterInfo& info)
-	{
-		char buf[512];
-
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf) - 1, "Name:     %s", info.crafterClass.empty() ? "N/A" : info.crafterClass.c_str());
-		buf[sizeof(buf) - 1] = '\0';
-		imgui->Text(buf);
-
-		if (info.buildingDesc.empty())
-			imgui->Text("Desc:     N/A");
-		else
-			RenderWrappedDesc(imgui, info.buildingDesc);
-
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf) - 1, "Speed:    %.2fx", info.craftingSpeed);
-		buf[sizeof(buf) - 1] = '\0';
-		imgui->Text(buf);
-
-		imgui->Separator();
-
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf) - 1, "Crafting: %s%s",
-			info.currentRecipeDisplayName.empty() ? info.currentRecipe.c_str() : info.currentRecipeDisplayName.c_str(),
-			info.bOutputFull ? " (Output Full)" : "");
-		buf[sizeof(buf) - 1] = '\0';
-		imgui->Text(buf);
-
-		if (info.recipeBuildTime > 0.f)
-		{
-			float ipm = (60.f / info.recipeBuildTime) * info.recipeOutputCount;
-			char ipmBuf[32];
-			if (ipm == floorf(ipm))
-				snprintf(ipmBuf, sizeof(ipmBuf), "%d/pm", static_cast<int>(ipm));
-			else
-				snprintf(ipmBuf, sizeof(ipmBuf), "%.1f/pm", ipm);
-
-			float bt = info.recipeBuildTime;
-			char timeBuf[16];
-			if (bt == floorf(bt))
-				snprintf(timeBuf, sizeof(timeBuf), "%ds", static_cast<int>(bt));
-			else
-				snprintf(timeBuf, sizeof(timeBuf), "%.1fs", bt);
-
-			memset(buf, 0, sizeof(buf));
-			snprintf(buf, sizeof(buf) - 1, "Interval: %s (%s)", timeBuf, ipmBuf);
-			buf[sizeof(buf) - 1] = '\0';
-			imgui->Text(buf);
-		}
-
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf) - 1, "Progress: %.1f%%", info.craftingProgress * 100.f);
-		buf[sizeof(buf) - 1] = '\0';
-		imgui->Text(buf);
-	}
-
-	void WailaUIManager::RenderStorageInfo(IModLoaderImGui* imgui, const Waila::StorageInfo& info)
-	{
-		char buf[512];
-
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf) - 1, "Name:     %s", info.buildingName.c_str());
-		buf[sizeof(buf) - 1] = '\0';
-		imgui->Text(buf);
-
-		if (!info.buildingDesc.empty())
-			RenderWrappedDesc(imgui, info.buildingDesc);
-
-		imgui->Separator();
-
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf) - 1, "Capacity: %d slots", info.maxCapacity);
-		buf[sizeof(buf) - 1] = '\0';
-		imgui->Text(buf);
-
-		for (const auto& item : info.storedItems)
-		{
-			memset(buf, 0, sizeof(buf));
-			snprintf(buf, sizeof(buf) - 1, "Storing %dx %s", item.count, item.displayName.c_str());
-			buf[sizeof(buf) - 1] = '\0';
-			imgui->Text(buf);
-		}
-	}
-
-	void WailaUIManager::RenderPowerInfo(IModLoaderImGui* imgui, const Waila::PowerInfo& info)
-	{
-		char buf[512];
-
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf) - 1, "Name:     %s", info.buildingName.c_str());
-		buf[sizeof(buf) - 1] = '\0';
-		imgui->Text(buf);
-
-		if (!info.buildingDesc.empty())
-			RenderWrappedDesc(imgui, info.buildingDesc);
-
-		imgui->Separator();
-
-		const char* statusStr = "Not Connected";
-		if (info.gridConnectionStatus == 1)
-			statusStr = "Connected";
-		else if (info.gridConnectionStatus == 2)
-			statusStr = "Connected (Off)";
-
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf) - 1, "Grid:     %s", statusStr);
-		buf[sizeof(buf) - 1] = '\0';
-		imgui->Text(buf);
-
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf) - 1, "Output:   %.1f W", info.buildingPower);
-		buf[sizeof(buf) - 1] = '\0';
-		imgui->Text(buf);
-
-		imgui->Separator();
-
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf) - 1, "Grid Gen: %.1f W", info.gridAddPower);
-		buf[sizeof(buf) - 1] = '\0';
-		imgui->Text(buf);
-
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf) - 1, "Grid Use: %.1f W", info.gridRemovePower);
-		buf[sizeof(buf) - 1] = '\0';
-		imgui->Text(buf);
-
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf) - 1, "Grid Cap: %.1f W", info.gridTotalPower);
-		buf[sizeof(buf) - 1] = '\0';
-		imgui->Text(buf);
-	}
-
-	static void RenderCoolerShared(IModLoaderImGui* imgui, const std::string& buildingName, const std::string& buildingDesc,
-		uint8_t state, int32_t connectedSockets, int32_t totalSockets)
-	{
-		char buf[512];
-
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf) - 1, "Name:     %s", buildingName.c_str());
-		buf[sizeof(buf) - 1] = '\0';
-		imgui->Text(buf);
-
-		if (!buildingDesc.empty())
-			RenderWrappedDesc(imgui, buildingDesc);
-
-		imgui->Separator();
-
-		const char* stateStr = "Unknown";
-		switch (state)
-		{
-		case 0: stateStr = "Idle";         break;
-		case 1: stateStr = "Working";      break;
-		case 2: stateStr = "No Fuel";      break;
-		case 3: stateStr = "Too Hot/Cold"; break;
-		}
-
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf) - 1, "State:    %s", stateStr);
-		buf[sizeof(buf) - 1] = '\0';
-		imgui->Text(buf);
-
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf) - 1, "Sockets:  %d / %d", connectedSockets, totalSockets);
-		buf[sizeof(buf) - 1] = '\0';
-		imgui->Text(buf);
-	}
-
-	void WailaUIManager::RenderCoolerActiveInfo(IModLoaderImGui* imgui, const Waila::CoolerActiveInfo& info)
-	{
-		RenderCoolerShared(imgui, info.buildingName, info.buildingDesc, info.state, info.connectedSockets, info.totalSockets);
-	}
-
-	void WailaUIManager::RenderCoolerPassiveInfo(IModLoaderImGui* imgui, const Waila::CoolerPassiveInfo& info)
-	{
-		RenderCoolerShared(imgui, info.buildingName, info.buildingDesc, info.state, info.connectedSockets, info.totalSockets);
-	}
-
-	void WailaUIManager::RenderCargoSenderInfo(IModLoaderImGui* imgui, const Waila::CargoSenderInfo& info)
-	{
-		char buf[512];
-
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf) - 1, "Name:     %s", info.buildingName.c_str());
-		buf[sizeof(buf) - 1] = '\0';
-		imgui->Text(buf);
-
-		if (!info.buildingDesc.empty())
-			RenderWrappedDesc(imgui, info.buildingDesc);
-
-		imgui->Separator();
-
-		imgui->Text(info.canSend ? "Status:   Loading Drone / Idle" : "Status:   Sending...");
-
-		memset(buf, 0, sizeof(buf));
-		float progress = info.sendProgress;
-
-		if (progress < 0.0f)
-			progress = 0.0f;
-
-		progress *= 100.0f;
-		snprintf(buf, sizeof(buf), "Progress: %.0f%%", progress);
-		imgui->Text(buf);
-
-		if (!info.sendingItemName.empty())
-		{
-			memset(buf, 0, sizeof(buf));
-			snprintf(buf, sizeof(buf) - 1, "Sending:  %s", info.sendingItemName.c_str());
-			buf[sizeof(buf) - 1] = '\0';
-			imgui->Text(buf);
-		}
-	}
-
-	void WailaUIManager::RenderCargoReceiverInfo(IModLoaderImGui* imgui, const Waila::CargoReceiverInfo& info)
-	{
-		char buf[512];
-
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf) - 1, "Name:     %s", info.buildingName.c_str());
-		buf[sizeof(buf) - 1] = '\0';
-		imgui->Text(buf);
-
-		if (!info.buildingDesc.empty())
-			RenderWrappedDesc(imgui, info.buildingDesc);
-
-		imgui->Separator();
-
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf) - 1, "Capacity: %d slots", info.maxCapacity);
-		buf[sizeof(buf) - 1] = '\0';
-		imgui->Text(buf);
-
-		for (const auto& item : info.storedItems)
-		{
-			memset(buf, 0, sizeof(buf));
-			snprintf(buf, sizeof(buf) - 1, "Storing %dx %s", item.count, item.displayName.c_str());
-			buf[sizeof(buf) - 1] = '\0';
-			imgui->Text(buf);
 		}
 	}
 

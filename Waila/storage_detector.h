@@ -5,7 +5,7 @@
 #include <cstdint>
 
 // Forward declare to avoid pulling in heavy SDK headers in this header
-namespace SDK { class AActor; }
+namespace SDK { class AActor; class UAuItemDataBase; class UCrBuildingData; }
 
 namespace Waila
 {
@@ -14,6 +14,9 @@ namespace Waila
 		std::string uniqueName;
 		std::string displayName;
 		int32_t     count = 0;
+
+		// Kept so the UI can reach the item's icon without a second lookup.
+		SDK::UAuItemDataBase* itemData = nullptr;
 	};
 
 	struct StorageInfo
@@ -23,6 +26,8 @@ namespace Waila
 		int32_t     maxCapacity = 0; // ItemStorage->GridColumns * GridRows
 		int32_t     usedSlots   = 0; // Non-empty, non-disabled slots
 		std::vector<StoredItemEntry> storedItems;
+
+		SDK::UCrBuildingData* buildingData = nullptr;
 
 		bool IsValid() const
 		{

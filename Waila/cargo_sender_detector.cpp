@@ -40,6 +40,8 @@ namespace Waila
 			? static_cast<UCrBuildingData*>(building->PlacementData)
 			: nullptr;
 
+		outInfo.buildingData = buildingData;
+
 		if (buildingData)
 		{
 			outInfo.buildingName = UKismetTextLibrary::Conv_TextToString(buildingData->BuildingName).ToString();
@@ -105,6 +107,7 @@ namespace Waila
 			// Primary: ItemType on the sender data entry (may be null)
 			if (bestMatch->ItemType && UKismetSystemLibrary::IsValid(bestMatch->ItemType))
 			{
+				outInfo.sendingItem     = bestMatch->ItemType;
 				outInfo.sendingItemName = UKismetTextLibrary::Conv_TextToString(bestMatch->ItemType->ItemName).ToString();
 			}
 			// Replicate GetSenderItem + GetStartSendServerTime inline in one pass.
@@ -134,7 +137,10 @@ namespace Waila
 
 					UCrItemDataBase* connItem = *reinterpret_cast<UCrItemDataBase**>(entry + CONN_ENTRY_ITEM);
 					if (connItem && UKismetSystemLibrary::IsValid(connItem))
+					{
+						outInfo.sendingItem     = connItem;
 						outInfo.sendingItemName = UKismetTextLibrary::Conv_TextToString(connItem->ItemName).ToString();
+					}
 
 					float startSendTime = *reinterpret_cast<float*>(entry + CONN_ENTRY_START_SEND_TIME);
 					if (startSendTime > 0.f && outInfo.sendingTime > 0.f)
