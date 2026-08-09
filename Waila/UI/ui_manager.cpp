@@ -295,7 +295,6 @@ namespace Waila::UI
 		m_showActionToast       = WailaPluginConfig::Config::GetShowActionToast();
 		m_scale                 = WailaPluginConfig::Config::GetScale();
 		m_opacity               = WailaPluginConfig::Config::GetOpacity();
-		m_lockOverlay           = WailaPluginConfig::Config::GetLockOverlay();
 		m_showDescriptions      = WailaPluginConfig::Config::ShouldRenderDescriptions();
 
 		ClampSettings();
@@ -319,19 +318,15 @@ namespace Waila::UI
 		// No NoSavedSettings, and pos_x/pos_y stay negative so the ModLoader never
 		// calls SetNextWindowPos: between them, wherever the player drags the card
 		// is what ImGui writes to its ini and restores next launch.
-		int flags = PluginWindowFlags_NoTitleBar
-		          | PluginWindowFlags_NoResize
-		          | PluginWindowFlags_NoScrollbar
-		          | PluginWindowFlags_NoBackground;
-
-		// Unlocked leaves ImGui's move handling on, so the card can be dragged by
-		// its body whenever the ModLoader UI (F2) has a cursor up. The render
-		// callback reserves the content region with an ID-less Dummy, which keeps
-		// every pixel of the card a drag handle rather than a widget.
-		if (m_lockOverlay)
-			flags |= PluginWindowFlags_NoMove | PluginWindowFlags_NoMouseInputs;
-
-		m_widgetHints.extra_window_flags = flags;
+		//
+		// ImGui's move handling stays on, so the card drags by its body whenever the
+		// ModLoader UI (F2) has a cursor up. The render callback reserves the content
+		// region with an ID-less Dummy, which keeps every pixel of the card a drag
+		// handle rather than a widget.
+		m_widgetHints.extra_window_flags = PluginWindowFlags_NoTitleBar
+		                                 | PluginWindowFlags_NoResize
+		                                 | PluginWindowFlags_NoScrollbar
+		                                 | PluginWindowFlags_NoBackground;
 	}
 
 	void WailaUIManager::RegisterMainWidget()
@@ -342,7 +337,6 @@ namespace Waila::UI
 		// Seeded with the smallest card so the first frame is never over-sized;
 		// Tick replaces this the moment there is something to show.
 		UpdateWindowHints(300.f * m_scale, 110.f * m_scale);
-		m_appliedFlags = m_widgetHints.extra_window_flags;
 
 		m_widgetDesc.name        = "WAILA";
 		m_widgetDesc.renderFn    = &WailaUIManager::OnRenderWidget;
@@ -367,7 +361,6 @@ namespace Waila::UI
 		m_self->hooks->UI->UnregisterWidget(m_widgetHandle);
 		m_widgetHandle  = nullptr;
 		m_widgetVisible = false;
-		m_appliedFlags  = -1;
 	}
 
 	void WailaUIManager::SetLockWidgetVisible(bool visible)
@@ -404,7 +397,6 @@ namespace Waila::UI
 		else if (strcmp(key, "Scale")           == 0) s_instance->m_scale                 = strtof(newValue, nullptr);
 		else if (strcmp(key, "Opacity")         == 0) s_instance->m_opacity               = strtof(newValue, nullptr);
 		else if (strcmp(key, "Show Action Toast") == 0) s_instance->m_showActionToast = ParseConfigBool(newValue);
-		else if (strcmp(key, "Lock Overlay")      == 0) s_instance->m_lockOverlay     = ParseConfigBool(newValue);
 		else if (strcmp(key, "Render Building Descriptions") == 0)
 		{
 			s_instance->m_showDescriptions = ParseConfigBool(newValue);
@@ -414,14 +406,9 @@ namespace Waila::UI
 
 		s_instance->ClampSettings();
 
-		// Size and colour changes land on their own; the lock flag is baked into
-		// the window at creation, so that one needs the widget rebuilt.
+		// Size and colour changes land on their own — the next Tick re-measures the
+		// card and pushes the new hints, and the window flags never vary.
 		s_instance->UpdateWindowHints(s_instance->m_widgetHints.width, s_instance->m_widgetHints.height);
-		if (s_instance->m_widgetHints.extra_window_flags != s_instance->m_appliedFlags)
-		{
-			s_instance->UnregisterMainWidget();
-			s_instance->RegisterMainWidget();
-		}
 	}
 
 	void WailaUIManager::ShowToast(const std::string& message)

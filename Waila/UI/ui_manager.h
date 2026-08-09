@@ -46,8 +46,6 @@ namespace Waila::UI
 		// ── WAILA info card ──────────────────────────────────────────────────
 		void RenderWidget(IModLoaderImGui* imgui);
 
-		// The card's window flags are baked in when the widget is created, so a
-		// lock/unlock has to rebuild it.
 		void RegisterMainWidget();
 		void UnregisterMainWidget();
 		void UpdateWindowHints(float width, float height);
@@ -89,14 +87,12 @@ namespace Waila::UI
 		// Card presentation, refreshed from config on change.
 		float m_scale            = 1.f;
 		float m_opacity          = 0.92f;
-		bool  m_lockOverlay      = false;
 		bool  m_showDescriptions = true;
 
 		WidgetHandle      m_widgetHandle     = nullptr;
 		bool              m_widgetVisible    = false;
 		PluginWidgetDesc  m_widgetDesc       = {};
 		PluginWindowHints m_widgetHints      = {};
-		int               m_appliedFlags     = -1;
 
 		WidgetHandle     m_lockWidgetHandle  = nullptr;
 		bool             m_lockWidgetVisible = false;

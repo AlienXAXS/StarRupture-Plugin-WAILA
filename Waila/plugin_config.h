@@ -64,13 +64,6 @@ namespace WailaPluginConfig
 			1.0f
 		},
 		{
-			"WAILA",
-			"Lock Overlay",
-			ConfigValueType::Boolean,
-			"false",
-			"Pin the card in place. Leave off to drag it with left click; its position is remembered either way"
-		},
-		{
 			"Hotkeys",
 			"Copy Recipe Key",
 			ConfigValueType::Keybind,
@@ -147,11 +140,6 @@ namespace WailaPluginConfig
 		static float GetOpacity()
 		{
 			return s_self ? s_self->config->ReadFloat(s_self, "WAILA", "Opacity", 0.92f) : 0.92f;
-		}
-
-		static bool GetLockOverlay()
-		{
-			return s_self ? s_self->config->ReadBool(s_self, "WAILA", "Lock Overlay", false) : false;
 		}
 
 		static std::string GetCopyKey()
