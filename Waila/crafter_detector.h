@@ -46,7 +46,6 @@ namespace Waila
 
 		// Populated for clipboard/paste use — null when building is idle
 		SDK::UCrItemRecipeData* recipeDataPtr = nullptr;
-		SDK::AActor*            actorPtr      = nullptr;
 
 		// Building definition the icon in the ring centre comes from. Null when
 		// PlacementData is missing or is not a building definition.

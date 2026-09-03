@@ -36,9 +36,6 @@
     <ClInclude Include="Core\raycaster.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="Core\recipe_clipboard.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="crafter_detector.h">
       <Filter>Handlers</Filter>
     </ClInclude>

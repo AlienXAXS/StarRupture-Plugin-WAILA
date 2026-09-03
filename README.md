@@ -13,11 +13,7 @@
   - **Passive Coolers** — passive heat-sink info
   - **Cargo Senders** — send interval, send progress, current item being shipped
   - **Cargo Receivers** — incoming cargo state
-- **Recipe Clipboard** — copy a recipe from any crafter (`C` by default) and paste it onto another of the same type (`V` by default)
-- **Lock Mode** — lock a recipe (`L` by default) to automatically paste it onto every newly-looked-at compatible crafter; a persistent HUD banner shows when lock mode is active
-- **Toast notifications** — brief on-screen confirmation shown after copy, paste, and lock actions (configurable)
-- Configurable max detection distance, separate action raycast distance, and optional building descriptions
-- All hotkeys are remappable via `Waila.ini`
+- Configurable max detection distance, card scale/opacity, and optional building descriptions
 - Thread-safe: game tick and ImGui render thread are fully decoupled via mutex
 
 ## Requirements
@@ -66,12 +62,7 @@ On first run, `Waila.ini` is generated in `<game_dir>/Plugins/config/` with defa
 |---|---|---|---|
 | `General` | `Enabled` | `true` | Enable or disable the plugin entirely |
 | `WAILA` | `Max Distance` | `650.0` | Maximum raycast range for HUD display in Unreal units (0 – 2500) |
-| `WAILA` | `Action Distance` | `3000.0` | Maximum raycast range for copy/paste/lock actions in Unreal units (650 – 10000) |
-| `WAILA` | `Show Action Toast` | `true` | Show a brief toast notification after copy, paste, or lock actions |
 | `WAILA` | `Render Building Descriptions` | `true` | Show/hide the building description line in the HUD panel |
-| `Hotkeys` | `Copy Recipe Key` | `C` | Key to copy the recipe from the looked-at crafter |
-| `Hotkeys` | `Paste Recipe Key` | `V` | Key to paste the clipboard recipe onto the looked-at crafter |
-| `Hotkeys` | `Lock Recipe Key` | `L` | Key to toggle lock mode (auto-paste onto newly-looked-at crafters) |
 
 ## Architecture
 
@@ -91,7 +82,6 @@ Engine tick → WailaUIManager::Tick()
 | [`plugin.cpp`](Waila/plugin.cpp) | `GetPluginInfo` / `PluginInit` / `PluginShutdown` C exports |
 | [`UI/ui_manager.h`](Waila/UI/ui_manager.h) | Singleton owning tick, ImGui widget, and thread-safe info structs |
 | [`Core/raycaster.h`](Waila/Core/raycaster.h) | Line trace from player eye; returns `RaycastHit` |
-| [`Core/recipe_clipboard.h`](Waila/Core/recipe_clipboard.h) | `RecipeClipboard` struct holding copied recipe data for paste/lock |
 | [`crafter_detector.h`](Waila/crafter_detector.h) | Detects and reads `ACrCrafter` actors |
 | [`storage_detector.h`](Waila/storage_detector.h) | Detects and reads storage buildings |
 | [`power_detector.h`](Waila/power_detector.h) | Detects and reads power buildings |

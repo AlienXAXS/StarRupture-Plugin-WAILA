@@ -24,22 +24,6 @@ namespace WailaPluginConfig
 		},
 		{
 			"WAILA",
-			"Action Distance",
-			ConfigValueType::Float,
-			"3000.0",
-			"Maximum distance for copy/paste/lock raycasts (units)",
-			650.0f,
-			10000.0f
-		},
-		{
-			"WAILA",
-			"Show Action Toast",
-			ConfigValueType::Boolean,
-			"true",
-			"Show a toast notification when copying, pasting, or locking a recipe"
-		},
-		{
-			"WAILA",
 			"Render Building Descriptions",
 			ConfigValueType::Boolean,
 			"true",
@@ -62,27 +46,6 @@ namespace WailaPluginConfig
 			"Opacity of the WAILA card background",
 			0.30f,
 			1.0f
-		},
-		{
-			"Hotkeys",
-			"Copy Recipe Key",
-			ConfigValueType::Keybind,
-			"C",
-			"Key to copy recipe from the looked-at building"
-		},
-		{
-			"Hotkeys",
-			"Paste Recipe Key",
-			ConfigValueType::Keybind,
-			"V",
-			"Key to paste clipboard recipe onto the looked-at building"
-		},
-		{
-			"Hotkeys",
-			"Lock Recipe Key",
-			ConfigValueType::Keybind,
-			"L",
-			"Key to toggle recipe lock mode (auto-paste on new placements)"
 		}
 	};
 
@@ -117,16 +80,6 @@ namespace WailaPluginConfig
 			return s_self ? s_self->config->ReadFloat(s_self, "WAILA", "Max Distance", 650.0f) : 650.0f;
 		}
 
-		static float GetActionDistance()
-		{
-			return s_self ? s_self->config->ReadFloat(s_self, "WAILA", "Action Distance", 3000.0f) : 3000.0f;
-		}
-
-		static bool GetShowActionToast()
-		{
-			return s_self ? s_self->config->ReadBool(s_self, "WAILA", "Show Action Toast", true) : true;
-		}
-
 		static bool ShouldRenderDescriptions()
 		{
 			return s_self ? s_self->config->ReadBool(s_self, "WAILA", "Render Building Descriptions", true) : true;
@@ -140,27 +93,6 @@ namespace WailaPluginConfig
 		static float GetOpacity()
 		{
 			return s_self ? s_self->config->ReadFloat(s_self, "WAILA", "Opacity", 0.92f) : 0.92f;
-		}
-
-		static std::string GetCopyKey()
-		{
-			char buf[32] = "C";
-			if (s_self) s_self->config->ReadString(s_self, "Hotkeys", "Copy Recipe Key", buf, sizeof(buf), "C");
-			return buf;
-		}
-
-		static std::string GetPasteKey()
-		{
-			char buf[32] = "V";
-			if (s_self) s_self->config->ReadString(s_self, "Hotkeys", "Paste Recipe Key", buf, sizeof(buf), "V");
-			return buf;
-		}
-
-		static std::string GetLockKey()
-		{
-			char buf[32] = "L";
-			if (s_self) s_self->config->ReadString(s_self, "Hotkeys", "Lock Recipe Key", buf, sizeof(buf), "L");
-			return buf;
 		}
 
 	private:

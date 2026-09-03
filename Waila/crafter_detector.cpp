@@ -144,7 +144,7 @@ namespace Waila
 					outInfo.currentRecipeDisplayName = SDK::UKismetTextLibrary::Conv_TextToString(itemData->ItemName).ToString();
 				}
 
-				// Store typed recipe pointer for clipboard use (UCrItemRecipeData extends UAuItemRecipeData)
+				// Store typed recipe pointer for the output icon (UCrItemRecipeData extends UAuItemRecipeData)
 				if (items[0].RecipeData->IsA(UCrItemRecipeData::StaticClass()))
 					outInfo.recipeDataPtr = static_cast<UCrItemRecipeData*>(items[0].RecipeData);
 
@@ -193,7 +193,6 @@ namespace Waila
 			}
 		}
 
-		outInfo.actorPtr = actor;
 		return true;
 	}
 }

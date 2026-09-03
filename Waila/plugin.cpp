@@ -69,6 +69,15 @@ extern "C" {
 		return &s_pluginInfo;
 	}
 
+	// Runs after GetPluginInfo and before PluginInit, and is the only context in
+	// which the loader lets a plugin pattern scan. Resolve here, install from
+	// PluginInit — self->hooks is null for the duration of this event.
+	__declspec(dllexport) void OnPluginLoadHooks(IPluginSelf* self, IPluginHookScanner* scanner)
+	{
+		g_self = self;
+		Waila::Functions::Resolve(self, scanner);
+	}
+
 	__declspec(dllexport) bool PluginInit(IPluginSelf* self)
 	{
 		try
@@ -77,7 +86,6 @@ extern "C" {
 
 			LOG_INFO("Plugin initializing...");
 
-			Waila::Functions::Init();
 			LOG_DEBUG("PluginInit: self = %p", self);
 			LOG_DEBUG("PluginInit: hooks = %p", self ? self->hooks : nullptr);
 			LOG_DEBUG("PluginInit: logger = %p", self ? self->logger : nullptr);
