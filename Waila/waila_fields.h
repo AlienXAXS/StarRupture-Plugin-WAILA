@@ -93,7 +93,7 @@ namespace Waila::Fields
 	inline auto ConnectionAmount         = WAILA_FIELD(FCrPackageTransportConnectionData, RequestedAmount);
 	inline auto ConnectionItem           = WAILA_FIELD(FCrPackageTransportConnectionData, Item);
 	// The send start time is a float on one game build and a double on another, so it
-	// is asked for with no size and read by the size the loader reports (see
+	// is asked for at any size and read by the size the loader reports (see
 	// StartSendTimeOf).
 	inline auto ConnectionStartSendTime  = SR_FIELD_ANY_SIZE(FCrPackageTransportConnectionData, StartSendServerTime, 0);
 	inline auto HelperNetID              = WAILA_FIELD(FCrMassEntityReplicationHelper, NetID);
