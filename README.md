@@ -77,13 +77,19 @@ On first run, `Waila.ini` is generated in `<game_dir>/Plugins/config/` with defa
 
 ## Configuration
 
-`Waila.ini` is auto-created on first run. Available options:
+`Waila.ini` is auto-created on first run. Edit it in game on the mod loader's config page (F2):
+
+<img src="images/config-tab.png" width="480" alt="The mod loader's Config tab with Waila selected">
+
+Available options:
 
 | Section | Key | Default | Description |
 |---|---|---|---|
 | `General` | `Enabled` | `true` | Enable or disable the plugin entirely |
 | `WAILA` | `Max Distance` | `650.0` | Maximum raycast range for HUD display in Unreal units (0 – 2500), counted from the player or the building drone |
 | `WAILA` | `Render Building Descriptions` | `true` | Show/hide the building description line in the HUD panel |
+| `WAILA` | `Scale` | `1.0` | Size of the card, 0.5 to 3.0; raise it for 4K displays |
+| `WAILA` | `Opacity` | `0.92` | Opacity of the card background, 0.3 to 1.0 |
 
 ## Architecture
 
