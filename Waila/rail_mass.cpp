@@ -646,7 +646,7 @@ namespace Waila::RailMass
 				link.receiver = resolve(Fields::ConnectionReceiver.In(entry));
 				link.item     = Fields::UniqueNameOf(item);
 				link.amount   = Fields::ValueOr<int32_t>(Fields::ConnectionAmount, entry);
-				link.start    = Fields::ValueOr<float>(Fields::ConnectionStartSendTime, entry);
+				link.start    = static_cast<float>(Fields::StartSendTimeOf(entry));
 				out.push_back(std::move(link));
 			}
 		}

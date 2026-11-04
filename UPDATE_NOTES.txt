@@ -3,4 +3,5 @@
 - Cargo Receivers and Senders count at a rate measured from their connections
 - Machine cards show what each ingredient needs per minute, the product per minute, and a red "short N/min" under an ingredient the machine is short of; a machine without electricity reads "No power"
 - The card follows the camera, so it works from the building drone, and the aim looks through drones riding a rail
+- The cargo send timer on the Cargo Sender card and the rail card's send rates work on the game's test branch as well as the public build
 - Aiming at a rail no longer flickers when a drone passes in front of it; the aim now looks through rail drones

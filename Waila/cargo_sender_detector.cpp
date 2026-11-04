@@ -144,12 +144,11 @@ namespace Waila
 						outInfo.sendingItemName = Fields::DisplayNameOf(connItem);
 					}
 
-					float startSendTime = Fields::ValueOr<float>(Fields::ConnectionStartSendTime, entry);
-					if (startSendTime > 0.f && outInfo.sendingTime > 0.f)
+					const double startSendTime = Fields::StartSendTimeOf(entry);
+					if (startSendTime > 0.0 && outInfo.sendingTime > 0.f)
 					{
-						double serverTime = gameStateBase->GetServerWorldTimeSeconds();
-						float elapsed = static_cast<float>(serverTime) - startSendTime;
-						outInfo.sendProgress = elapsed / outInfo.sendingTime;
+						const double serverTime = gameStateBase->GetServerWorldTimeSeconds();
+						outInfo.sendProgress = static_cast<float>((serverTime - startSendTime) / outInfo.sendingTime);
 					}
 					break;
 				}
