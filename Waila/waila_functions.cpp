@@ -78,6 +78,18 @@ namespace Waila::Fields
             HelperNetID, HelperEntity, PlacementSockets, SocketUseCount,
             SenderIsSender, SenderLocation, SenderItemType, SenderEntity);
 
+        // The send start time is read as a float or a double, by the size the loader
+        // reports. Any other size is not read: the features that list it are off.
+        if (ConnectionStartSendTime.offset >= 0 && ConnectionStartSendTime.resolvedSize != sizeof(float)
+            && ConnectionStartSendTime.resolvedSize != sizeof(double))
+        {
+            scanner->ReportFailure(self, ConnectionStartSendTime.key,
+                ("StartSendServerTime is " + std::to_string(ConnectionStartSendTime.resolvedSize)
+                    + " bytes on this build; WAILA reads a float or a double").c_str());
+            ConnectionStartSendTime.offset = -1;
+            all = false;
+        }
+
         for (PluginFieldSpec* size : { &StorageItemSize, &CraftItemSize, &RecipeOrderSize, &SocketDataSize,
                                        &PlacementSocketSize, &SenderReceiverSize, &ConnectionDataSize, &HelperSize })
             all = ResolveSize(scanner, self, *size) && all;
