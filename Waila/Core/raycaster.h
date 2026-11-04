@@ -21,12 +21,13 @@ namespace Waila::Core
 	class WailaRaycastSystem
 	{
 	public:
-		// Performs a line trace from the local player's eye position.
+		// Performs a line trace from the player's camera.
 		// Returns true if something was hit; actor in outHit may still be null if component has no owner.
 		bool PerformRaycast(float maxDistance, RaycastHit& outHit);
 
 	private:
 		SDK::APawn* GetLocalPlayer() const;
 		bool GetPlayerEyeData(SDK::FVector& outLocation, SDK::FRotator& outRotation) const;
+		static void IgnoreWithHierarchy(SDK::AActor* actor, SDK::TArray<SDK::AActor*>& ignoreActors);
 	};
 }
