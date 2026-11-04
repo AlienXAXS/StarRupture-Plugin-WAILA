@@ -119,7 +119,10 @@ namespace Waila::Core
 
 		// Build ignore list — exclude the local player pawn, the actor the camera
 		// follows, and their hierarchies
-		TArray<AActor*> ignoreActors;
+		// The SDK's TArray::Add only fills existing slack, so the list needs its
+		// own buffer: on an empty TArray every Add fails and nothing is ignored.
+		constexpr int32 kMaxIgnoredActors = 64;
+		TAllocatedArray<AActor*> ignoreActors(kMaxIgnoredActors);
 		IgnoreWithHierarchy(localPawn, ignoreActors);
 		if (viewTarget != localPawn)
 			IgnoreWithHierarchy(viewTarget, ignoreActors);
