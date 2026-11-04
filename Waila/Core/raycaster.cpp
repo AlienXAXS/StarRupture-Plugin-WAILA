@@ -5,7 +5,6 @@
 #include "Engine_structs.hpp"
 #include "CoreUObject_structs.hpp"
 #include "Chimera_classes.hpp"
-#include "MassRepresentation_classes.hpp"
 #include "plugin_map.h"
 
 using namespace SDK;
@@ -159,7 +158,10 @@ namespace Waila::Core
 
 		// Build ignore list — exclude the local player pawn, the actor the camera
 		// follows, and their hierarchies
-		TArray<AActor*> ignoreActors;
+		// The SDK's TArray::Add only fills existing slack, so the list needs its
+		// own buffer: on an empty TArray every Add fails and nothing is ignored.
+		constexpr int32 kMaxIgnoredActors = 64;
+		TAllocatedArray<AActor*> ignoreActors(kMaxIgnoredActors);
 		IgnoreWithHierarchy(localPawn, ignoreActors);
 		if (viewTarget != localPawn)
 			IgnoreWithHierarchy(viewTarget, ignoreActors);
@@ -169,9 +171,6 @@ namespace Waila::Core
 
 		// A drone riding a rail is not what the player aims at: when the trace lands
 		// on one, ignore it and trace again, so the hit falls on the rail behind it.
-		// Up close a rail drone is its own actor (ACrDroneBase); further out the
-		// game draws it as an instance of a Mass visualizer's instanced mesh, whose
-		// owner is the AMassVisualizer. Neither ever has a card of its own.
 		// The bound only guards a rail with a queue of drones in front of the camera.
 		constexpr int kMaxDroneRetraces = 8;
 		bool bHit = false;
@@ -202,8 +201,6 @@ namespace Waila::Core
 			{
 				if (hitOwner->IsA(ACrDroneBase::StaticClass()))
 					skipReason = "drone actor";
-				else if (hitOwner->IsA(AMassVisualizer::StaticClass()))
-					skipReason = "mass visualizer";
 			}
 			LogAimHit(hitResult, hitOwner, skipReason);
 			if (!skipReason)
