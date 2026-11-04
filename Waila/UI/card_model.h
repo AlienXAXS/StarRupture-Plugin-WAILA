@@ -29,7 +29,9 @@ namespace Waila::UI
 		PluginTextureHandle icon = nullptr;
 		std::string         label;
 		Health              tone = Health::Idle;
-		bool                dim  = false;   // input the machine hasn't got
+		bool                dim  = false;   // input the machine is short of
+		std::string         rate;           // "N/min" needed at full speed, drawn above the tile; empty for none
+		std::string         shortage;       // "short N/min", drawn under the tile; empty when nothing is missing
 	};
 
 	// A figure with a short caption, used by buildings that have no recipe to draw.

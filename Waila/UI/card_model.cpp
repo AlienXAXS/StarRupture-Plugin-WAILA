@@ -122,8 +122,14 @@ namespace Waila::UI
 			return;
 		}
 
-		// Output full is the more actionable of the two — say that one first.
-		if (info.bOutputFull)
+		// A stop the game reports for another reason comes first; then output full,
+		// the more actionable of the two item stalls.
+		if (info.bNoPower)
+		{
+			out.status     = Health::Bad;
+			out.statusText = "No power";
+		}
+		else if (info.bOutputFull)
 		{
 			out.status     = Health::Bad;
 			out.statusText = "Output full";
@@ -146,17 +152,33 @@ namespace Waila::UI
 			FlowSlot slot;
 			slot.icon = in.itemData ? Icons::ForItem(in.itemData) : Icons::ForItemClass(in.itemClass);
 
-			// The badge states what the recipe wants. Whether the machine currently
-			// holds enough is carried by the tile's dimming and red keyline, so the
-			// stock figure would only be a second way of saying the same thing.
+			// The badge states what the recipe wants a cycle.
 			char buf[32];
 			snprintf(buf, sizeof(buf), "%d", in.need);
 			slot.label = buf;
 
-			if (in.have >= 0)
+			if (in.perMin >= 0.0f)
 			{
-				slot.dim  = in.have < in.need;
-				slot.tone = slot.dim ? Health::Bad : Health::Idle;
+				// What the machine needs a minute at full speed, above the tile.
+				char full[24];
+				Draw::FormatNumber(full, sizeof(full), in.perMin);
+				slot.rate = std::string(full) + "/min";
+
+				// Short when the store can't fund the next cycle and what has been
+				// arriving doesn't make up the difference. A machine stopped for power
+				// or blocked by a full output isn't waiting on its inputs, so none is
+				// blamed. Gaps under a tenth of the need are delivery jitter, not a
+				// shortage.
+				if (!info.bNoPower && !info.bOutputFull && in.have >= 0 && in.have < in.need && in.arrivalPerMin >= 0.0f)
+				{
+					const float missing = in.perMin - in.arrivalPerMin;
+					if (missing >= in.perMin * 0.1f && missing >= 0.5f)
+					{
+						slot.shortage = "short " + Num(static_cast<int32_t>(std::lround(missing))) + "/min";
+						slot.dim      = true;
+						slot.tone     = Health::Bad;
+					}
+				}
 			}
 
 			out.inputs.push_back(std::move(slot));
@@ -182,17 +204,19 @@ namespace Waila::UI
 
 		if (info.recipeBuildTime > 0.0f)
 		{
-			const float perMinute = (60.0f / info.recipeBuildTime) * static_cast<float>(info.recipeOutputCount);
+			const float perMinute = info.outputPerMin > 0.0f ? info.outputPerMin : 0.0f;
 
 			char num[24];
 			Draw::FormatNumber(num, sizeof(num), out.status == Health::Bad ? 0.0f : perMinute);
 			out.rateValue = num;
 			out.rateUnit  = "/min";
 
-			char cycle[32];
+			char cycle[56];
+			char full[24];
 			char secs[24];
+			Draw::FormatNumber(full, sizeof(full), perMinute);
 			Draw::FormatSeconds(secs, sizeof(secs), info.recipeBuildTime);
-			snprintf(cycle, sizeof(cycle), "%s cycle", secs);
+			snprintf(cycle, sizeof(cycle), "of %s/min, %s cycle", full, secs);
 			out.rateSub = cycle;
 
 			if (out.status != Health::Bad)
