@@ -5,6 +5,7 @@
 #include "Engine_structs.hpp"
 #include "CoreUObject_structs.hpp"
 #include "Chimera_classes.hpp"
+#include "MassRepresentation_classes.hpp"
 #include "plugin_map.h"
 
 using namespace SDK;
@@ -73,6 +74,45 @@ namespace Waila::Core
 		}
 	}
 
+	// Capture log for the rail-drone aim fix: one line per distinct hit
+	// (owner, component) while a rail is or was the target, with the reason a
+	// hit was traced through. The pointers are only compared, never followed.
+	void WailaRaycastSystem::LogAimHit(const FHitResult& hit, AActor* owner, const char* skipReason)
+	{
+		static uintptr_t s_lastOwner = 0;
+		static uintptr_t s_lastComp  = 0;
+		static bool      s_railSeen  = false;
+
+		UPrimitiveComponent* comp = hit.Component.Get();
+		const uintptr_t ownerKey = reinterpret_cast<uintptr_t>(owner);
+		const uintptr_t compKey  = reinterpret_cast<uintptr_t>(comp);
+		if (ownerKey == s_lastOwner && compKey == s_lastComp)
+			return;
+		s_lastOwner = ownerKey;
+		s_lastComp  = compKey;
+
+		const bool isRail = owner && UKismetSystemLibrary::IsValid(owner) && owner->IsA(ACrDronePathPointConnection::StaticClass());
+		const bool wasRail = s_railSeen;
+		if (!skipReason)
+			s_railSeen = isRail;
+		if (!isRail && !wasRail)
+			return;
+
+		std::string ownerClass = owner && owner->Class ? owner->Class->GetName() : "(null)";
+		std::string ownerName  = owner ? owner->GetName() : "(null)";
+		std::string compClass  = comp && comp->Class ? comp->Class->GetName() : "(null)";
+		std::string compName   = comp ? comp->GetName() : "(null)";
+		std::string meshName   = "-";
+		if (comp && comp->IsA(UStaticMeshComponent::StaticClass()))
+		{
+			UStaticMesh* mesh = static_cast<UStaticMeshComponent*>(comp)->StaticMesh;
+			meshName = mesh ? mesh->GetName() : "(none)";
+		}
+		LOG_INFO("[AimCapture] owner=%s (%s) comp=%s (%s) mesh=%s item=%d dist=%.0f -> %s",
+			ownerName.c_str(), ownerClass.c_str(), compName.c_str(), compClass.c_str(),
+			meshName.c_str(), hit.Item, hit.Distance, skipReason ? skipReason : "target");
+	}
+
 	bool WailaRaycastSystem::PerformRaycast(float maxDistance, RaycastHit& outHit)
 	{
 		outHit = {};
@@ -129,6 +169,9 @@ namespace Waila::Core
 
 		// A drone riding a rail is not what the player aims at: when the trace lands
 		// on one, ignore it and trace again, so the hit falls on the rail behind it.
+		// Up close a rail drone is its own actor (ACrDroneBase); further out the
+		// game draws it as an instance of a Mass visualizer's instanced mesh, whose
+		// owner is the AMassVisualizer. Neither ever has a card of its own.
 		// The bound only guards a rail with a queue of drones in front of the camera.
 		constexpr int kMaxDroneRetraces = 8;
 		bool bHit = false;
@@ -154,7 +197,16 @@ namespace Waila::Core
 
 			UPrimitiveComponent* hitComp = hitResult.Component.Get();
 			AActor* hitOwner = hitComp ? hitComp->GetOwner() : nullptr;
-			if (!hitOwner || !UKismetSystemLibrary::IsValid(hitOwner) || !hitOwner->IsA(ACrDroneBase::StaticClass()))
+			const char* skipReason = nullptr;
+			if (hitOwner && UKismetSystemLibrary::IsValid(hitOwner))
+			{
+				if (hitOwner->IsA(ACrDroneBase::StaticClass()))
+					skipReason = "drone actor";
+				else if (hitOwner->IsA(AMassVisualizer::StaticClass()))
+					skipReason = "mass visualizer";
+			}
+			LogAimHit(hitResult, hitOwner, skipReason);
+			if (!skipReason)
 				break;
 			ignoreActors.Add(hitOwner);
 			if (attempt == kMaxDroneRetraces)

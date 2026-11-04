@@ -3,7 +3,7 @@
 #include "Engine_structs.hpp"
 
 // Forward declarations
-namespace SDK { class AActor; class APawn; struct FRotator; }
+namespace SDK { class AActor; class APawn; struct FRotator; struct FHitResult; }
 
 namespace Waila::Core
 {
@@ -28,6 +28,7 @@ namespace Waila::Core
 	private:
 		SDK::APawn* GetLocalPlayer() const;
 		bool GetPlayerEyeData(SDK::FVector& outLocation, SDK::FRotator& outRotation) const;
+		static void LogAimHit(const SDK::FHitResult& hit, SDK::AActor* owner, const char* skipReason);
 		static void IgnoreWithHierarchy(SDK::AActor* actor, SDK::TArray<SDK::AActor*>& ignoreActors);
 	};
 }
