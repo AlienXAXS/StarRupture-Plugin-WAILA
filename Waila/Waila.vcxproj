@@ -300,6 +300,7 @@
     <ClInclude Include="plugin.h" />
     <ClInclude Include="plugin_config.h" />
     <ClInclude Include="plugin_helpers.h" />
+    <ClInclude Include="waila_fields.h" />
     <ClInclude Include="waila_functions.h" />
     <ClInclude Include="Core\raycaster.h" />
     <ClInclude Include="crafter_detector.h" />
@@ -309,6 +310,9 @@
     <ClInclude Include="cooler_passive_detector.h" />
     <ClInclude Include="cargo_sender_detector.h" />
     <ClInclude Include="cargo_receiver_detector.h" />
+    <ClInclude Include="rail_detector.h" />
+    <ClInclude Include="rail_mass.h" />
+    <ClInclude Include="rail_network.h" />
     <ClInclude Include="UI\ui_manager.h" />
     <ClInclude Include="UI\ui_theme.h" />
     <ClInclude Include="UI\ui_draw.h" />
@@ -335,6 +339,8 @@
     <ClCompile Include="cooler_passive_detector.cpp" />
     <ClCompile Include="cargo_sender_detector.cpp" />
     <ClCompile Include="cargo_receiver_detector.cpp" />
+    <ClCompile Include="rail_detector.cpp" />
+    <ClCompile Include="rail_mass.cpp" />
     <ClCompile Include="UI\ui_manager.cpp" />
     <ClCompile Include="UI\ui_theme.cpp" />
     <ClCompile Include="UI\ui_draw.cpp" />

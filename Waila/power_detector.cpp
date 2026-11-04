@@ -1,5 +1,6 @@
 #include "power_detector.h"
 #include "plugin_helpers.h"
+#include "waila_fields.h"
 #include "Chimera_classes.hpp"
 #include "Chimera_structs.hpp"
 
@@ -22,18 +23,11 @@ namespace Waila
 
 		ACrBuildingActorBase* building = static_cast<ACrBuildingActorBase*>(actor);
 
-		UCrBuildingData* buildingData = (building->PlacementData && building->PlacementData->IsA(UCrBuildingData::StaticClass()))
-			? static_cast<UCrBuildingData*>(building->PlacementData)
-			: nullptr;
+		UCrBuildingData* buildingData = Fields::BuildingDataOf(building);
 
 		outInfo.buildingData = buildingData;
 
-		if (buildingData)
-		{
-			outInfo.buildingName = UKismetTextLibrary::Conv_TextToString(buildingData->BuildingName).ToString();
-			outInfo.buildingDesc = UKismetTextLibrary::Conv_TextToString(buildingData->BuildingDescription).ToString();
-		}
-		else
+		if (!Fields::ReadBuildingTexts(buildingData, outInfo.buildingName, outInfo.buildingDesc))
 		{
 			outInfo.buildingName = actor->Class ? actor->Class->GetName() : "Generator";
 			outInfo.buildingDesc = "";

@@ -1,5 +1,6 @@
 #include "icon_cache.h"
 #include "plugin_helpers.h"
+#include "waila_fields.h"
 
 #include "Engine_classes.hpp"
 #include "Chimera_classes.hpp"
@@ -93,9 +94,9 @@ namespace Waila::UI
 			return handle;
 		}
 
-		PluginTextureHandle ResolveBrush(const FSlateBrush& brush)
+		PluginTextureHandle ResolveBrush(const FSlateBrush* brush)
 		{
-			return Resolve(BrushTexture(brush));
+			return brush ? Resolve(BrushTexture(*brush)) : nullptr;
 		}
 	}
 
@@ -170,7 +171,7 @@ namespace Waila::UI
 	{
 		if (!g_available || !building || !UKismetSystemLibrary::IsValid(building))
 			return nullptr;
-		return ResolveBrush(building->Icon);
+		return ResolveBrush(Fields::IconOf(building));
 	}
 
 	PluginTextureHandle Icons::ForRecipe(UCrItemRecipeData* recipe)
@@ -180,7 +181,7 @@ namespace Waila::UI
 
 		// A recipe carries its own presentation icon; fall back to the item it
 		// produces when the recipe brush is empty.
-		if (PluginTextureHandle handle = ResolveBrush(recipe->Icon))
+		if (PluginTextureHandle handle = ResolveBrush(Fields::IconOf(recipe)))
 			return handle;
 
 		return ForItem(recipe->GetItemDataBase());
@@ -190,7 +191,7 @@ namespace Waila::UI
 	{
 		if (!g_available || !item || !UKismetSystemLibrary::IsValid(item))
 			return nullptr;
-		return ResolveBrush(item->ItemIcon);
+		return ResolveBrush(Fields::IconOf(item));
 	}
 
 	PluginTextureHandle Icons::ForItemClass(UClass* itemClass)

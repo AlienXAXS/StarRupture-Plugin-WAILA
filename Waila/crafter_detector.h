@@ -5,7 +5,7 @@
 #include <vector>
 
 // Forward declare to avoid pulling in heavy SDK headers in this header
-namespace SDK { class AActor; class UClass; class UCrItemRecipeData; class UAuItemDataBase; class UCrBuildingData; }
+namespace SDK { class AActor; class UClass; class UCrItemRecipeData; class UAuItemRecipeData; class UAuItemDataBase; class UCrBuildingData; }
 
 namespace Waila
 {
@@ -23,6 +23,10 @@ namespace Waila
 
 		bool IsValid() const { return itemClass != nullptr || itemData != nullptr; }
 	};
+
+	// Items per minute of count items per craft of a recipe at a crafting
+	// speed: count / BuildTime x speed x 60.
+	bool CountRate(SDK::UAuItemRecipeData* recipe, int32_t count, float speed, float& outRate);
 
 	struct CrafterInfo
 	{

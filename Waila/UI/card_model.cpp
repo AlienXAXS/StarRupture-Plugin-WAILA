@@ -9,7 +9,9 @@
 #include "cooler_passive_detector.h"
 #include "cargo_sender_detector.h"
 #include "cargo_receiver_detector.h"
+#include "rail_detector.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 
@@ -65,8 +67,7 @@ namespace Waila::UI
 		std::string NumCompact(int32_t v)
 		{
 			char buf[24];
-			if (v >= 100000)     snprintf(buf, sizeof(buf), "%dk", v / 1000);
-			else if (v >= 10000) snprintf(buf, sizeof(buf), "%.0fk", v / 1000.0f);
+			if (v >= 99950)      snprintf(buf, sizeof(buf), "%dk", (v + 500) / 1000);
 			else if (v >= 1000)  snprintf(buf, sizeof(buf), "%.1fk", v / 1000.0f);
 			else                 snprintf(buf, sizeof(buf), "%d", v);
 			return buf;
@@ -279,6 +280,146 @@ namespace Waila::UI
 		{
 			out.status     = Health::Idle;
 			out.statusText = "Empty";
+		}
+	}
+
+	// -------------------------------------------------------------------------
+	// Drone rail
+	// -------------------------------------------------------------------------
+
+	namespace
+	{
+		// Past this the list stops being a glance: item rows and their From, To,
+		// stock and totals lines together.
+		constexpr size_t kMaxRateRows = 12;
+
+		std::string PerMin(float v, bool plusUnknown = false)
+		{
+			if (v < 0.0f)
+				return "?";
+			if (plusUnknown)
+				return PerMin(v) + "+?";
+
+			// FormatNumber would round a slow trickle down to "0".
+			if (v > 0.0f && v < 0.05f)
+				return "<0.1";
+
+			char buf[24];
+			Draw::FormatNumber(buf, sizeof(buf), v);
+			return buf;
+		}
+
+		// The spans of a From or To line, which `prefix` characters of "From " or
+		// "To " precede, drawn in `tone`.
+		std::vector<RateRow::Span> Spans(const std::vector<Waila::RailTextSpan>& in, size_t prefix, Health tone)
+		{
+			std::vector<RateRow::Span> out;
+			for (const Waila::RailTextSpan& s : in)
+				out.push_back({ prefix + s.begin, prefix + s.end, tone });
+			return out;
+		}
+
+		// An item's lines under its name, in order: where it comes from, where it
+		// goes, how short the takers are of it, what the storage on the network
+		// holds of it, then its totals. The middle three are left out when not
+		// known or not needed.
+		struct ItemLines
+		{
+			RateRow              head;
+			std::vector<RateRow> details;
+			RateRow              totals;
+		};
+
+		ItemLines LinesOf(const Waila::RailRateEntry& r)
+		{
+			ItemLines lines;
+			lines.head.icon = Icons::ForItem(r.itemData);
+			lines.head.name = r.displayName;
+			using Lead = RateRow::Lead;
+			if (!r.from.empty())
+				lines.details.push_back({ nullptr, "From " + r.from, true, Lead::Bullet, Spans(r.fromStarved, 5, Health::Bad) });
+			if (!r.to.empty())
+				lines.details.push_back({ nullptr, "To " + r.to, true, Lead::Bullet, Spans(r.toShort, 3, Health::Warn) });
+			if (r.perMinShort > 0.0f)
+			{
+				// Amber like the card's dot, the whole line.
+				const std::string text = "Short " + PerMin(r.perMinShort) + "/min";
+				lines.details.push_back({ nullptr, text, true, Lead::Bullet, { { 0, text.size(), Health::Warn } } });
+			}
+			if (r.stored >= 0 && !r.storedIn.empty())
+			{
+				const int32_t count = static_cast<int32_t>((std::min)(r.stored, static_cast<int64_t>(INT32_MAX)));
+				lines.details.push_back({ nullptr, "Stored " + NumCompact(count) + " in " + r.storedIn, true, Lead::Bullet });
+			}
+			// The totals line is indented like the others with nothing in front.
+			lines.totals.lead = Lead::None;
+			// "\xC2\xB7" is a middle dot.
+			lines.totals.name = "min " + PerMin(r.perMinMin) + " \xC2\xB7 max " + PerMin(r.perMinMax, r.plusUnknown)
+				+ " \xC2\xB7 current " + PerMin(r.perMinNow, r.plusUnknown) + " /min";
+			return lines;
+		}
+	}
+
+	void Card::FromRail(const Waila::RailInfo& info, CardModel& out)
+	{
+		BeginCard(out, Accent::Cargo, info.buildingName, info.buildingDesc, info.buildingData);
+
+		out.hasRates = true;
+		out.chip     = info.filterName;
+		if (info.capacity >= 0.0f)
+		{
+			char num[24];
+			Draw::FormatNumber(num, sizeof(num), info.capacity);
+			out.titleNote = std::string(num) + "/min";
+		}
+
+		// Each item's lines together. When they do not all fit, every item keeps
+		// its name and totals and the From, To and stock lines fill the room
+		// left, first item first.
+		std::vector<ItemLines> items;
+		size_t total = 0;
+		for (const Waila::RailRateEntry& r : info.rates)
+		{
+			items.push_back(LinesOf(r));
+			total += 2 + items.back().details.size();
+		}
+		size_t room  = kMaxRateRows > 2 * items.size() ? kMaxRateRows - 2 * items.size() : 0;
+		size_t shown = 0;
+		for (ItemLines& lines : items)
+		{
+			if (shown + 2 > kMaxRateRows)
+				break;
+			out.rates.push_back(std::move(lines.head));
+			for (size_t i = 0; i < lines.details.size() && room > 0; ++i, --room, ++shown)
+				out.rates.push_back(std::move(lines.details[i]));
+			out.rates.push_back(std::move(lines.totals));
+			shown += 2;
+		}
+		const size_t more = total - shown;
+
+		if (out.rates.empty())
+			out.ratesNote = info.fromMass && !info.note.empty() ? info.note : "No sources found";
+
+		char buf[48];
+		if (info.fromCount + info.destCount > 0)
+		{
+			snprintf(buf, sizeof(buf), "From %d to %d%s", info.fromCount, info.destCount, info.truncated ? "+" : "");
+			out.statusText = buf;
+			out.status = info.feed == Waila::RailInfo::Feed::Starved ? Health::Bad
+			           : info.feed == Waila::RailInfo::Feed::Short   ? Health::Warn
+			           : info.feed == Waila::RailInfo::Feed::Fed     ? Health::Good : Health::Idle;
+		}
+		else if (info.sourceCount > 0)
+		{
+			snprintf(buf, sizeof(buf), "%d source%s%s", info.sourceCount,
+				info.sourceCount == 1 ? "" : "s", info.truncated ? "+" : "");
+			out.statusText = buf;
+		}
+
+		if (more > 0)
+		{
+			snprintf(buf, sizeof(buf), "+%d more", static_cast<int>(more));
+			out.footRight = buf;
 		}
 	}
 

@@ -1,5 +1,6 @@
 #include "cooler_active_detector.h"
 #include "plugin_helpers.h"
+#include "waila_fields.h"
 #include "Chimera_classes.hpp"
 #include "Chimera_structs.hpp"
 #include "BP_CoolerActive_classes.hpp"
@@ -29,18 +30,11 @@ namespace Waila
 		ABP_CoolerActive_C* cooler = static_cast<ABP_CoolerActive_C*>(actor);
 		ACrBuildingActorBase* building = static_cast<ACrBuildingActorBase*>(actor);
 
-		UCrBuildingData* buildingData = (building->PlacementData && building->PlacementData->IsA(UCrBuildingData::StaticClass()))
-			? static_cast<UCrBuildingData*>(building->PlacementData)
-			: nullptr;
+		UCrBuildingData* buildingData = Fields::BuildingDataOf(building);
 
 		outInfo.buildingData = buildingData;
 
-		if (buildingData)
-		{
-			outInfo.buildingName = UKismetTextLibrary::Conv_TextToString(buildingData->BuildingName).ToString();
-			outInfo.buildingDesc = UKismetTextLibrary::Conv_TextToString(buildingData->BuildingDescription).ToString();
-		}
-		else
+		if (!Fields::ReadBuildingTexts(buildingData, outInfo.buildingName, outInfo.buildingDesc))
 		{
 			outInfo.buildingName = actor->Class ? actor->Class->GetName() : "Active Cooler";
 			outInfo.buildingDesc = "";
@@ -48,16 +42,12 @@ namespace Waila
 
 		outInfo.state = static_cast<uint8_t>(cooler->GetHeaterCoolerState());
 
-		if (cooler->AuActorPlacementSockets && UKismetSystemLibrary::IsValid(cooler->AuActorPlacementSockets))
-		{
-			const TArray<FAuActorPlacementSingleSocketData>& sockets = cooler->AuActorPlacementSockets->Sockets;
-			outInfo.totalSockets = sockets.Num();
-			for (int32 i = 0; i < sockets.Num(); ++i)
-			{
-				if (sockets[i].UseCount > 0)
-					++outInfo.connectedSockets;
-			}
-		}
+		// The Blueprint class's own component pointer, found by name; the sockets are
+		// the component's, which is an SDK class.
+		UAuActorPlacementSocketsComponent** socketsAt = Fields::ActiveCoolerSockets.In(Fields::ObjectProperties(), cooler);
+		UAuActorPlacementSocketsComponent* socketsComponent = socketsAt ? *socketsAt : nullptr;
+		if (socketsComponent && UKismetSystemLibrary::IsValid(socketsComponent))
+			Fields::CountSockets(socketsComponent, outInfo.totalSockets, outInfo.connectedSockets);
 
 		return true;
 	}

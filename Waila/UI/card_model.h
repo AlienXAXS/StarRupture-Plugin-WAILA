@@ -3,6 +3,7 @@
 #include "plugin_interface.h"
 #include "ui_theme.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -16,6 +17,7 @@ namespace Waila
 	struct CoolerPassiveInfo;
 	struct CargoSenderInfo;
 	struct CargoReceiverInfo;
+	struct RailInfo;
 }
 
 namespace Waila::UI
@@ -38,6 +40,29 @@ namespace Waila::UI
 		Health      tone = Health::Idle;
 	};
 
+	// One line of a drone rail's card: an item's name with its icon, or a line
+	// under it (where it comes from and goes, what is stored, its totals).
+	struct RateRow
+	{
+		// What stands in the icon column in front of the text.
+		enum class Lead : uint8_t { Icon, Bullet, None };
+
+		// A stretch of `name` drawn in a health colour instead of the plain one:
+		// byte offsets, end exclusive.
+		struct Span
+		{
+			size_t begin = 0;
+			size_t end   = 0;
+			Health tone  = Health::Idle;
+		};
+
+		PluginTextureHandle icon = nullptr;
+		std::string         name;
+		bool                wrap = false;   // a long line continues on the next one instead of being cut
+		Lead                lead = Lead::Icon;
+		std::vector<Span>   spans;          // coloured stretches of `name`, in order
+	};
+
 	// Everything the card needs for one frame, with every engine pointer already
 	// resolved to a texture handle or a string.
 	//
@@ -52,9 +77,10 @@ namespace Waila::UI
 		PluginTextureHandle buildingIcon = nullptr;
 
 		std::string title;        // building name
+		std::string titleNote;    // muted, right after the title
 		std::string chip;         // left chip — speed multiplier and the like
 		std::string statusText;   // right chip
-		Health      status = Health::Idle;
+		Health      status = Health::Idle;   // colours the right chip and its dot
 
 		float progress      = 0.0f;
 		bool  progressValid = false;
@@ -73,6 +99,12 @@ namespace Waila::UI
 		std::vector<FlowSlot> stock;      // every entry has an icon
 		int32_t               stockMore = 0;   // kinds held that didn't fit the grid
 		std::vector<StatCell> stats;
+
+		// Rate body: what a drone rail's sources make. `ratesNote` stands in when
+		// there is nothing to list.
+		bool                  hasRates = false;
+		std::vector<RateRow>  rates;
+		std::string           ratesNote;
 
 		std::string footLeft;
 		std::string footRight;
@@ -95,5 +127,6 @@ namespace Waila::UI
 		void FromCoolerPassive(const Waila::CoolerPassiveInfo& info, CardModel& out);
 		void FromCargoSender  (const Waila::CargoSenderInfo&   info, CardModel& out);
 		void FromCargoReceiver(const Waila::CargoReceiverInfo& info, CardModel& out);
+		void FromRail         (const Waila::RailInfo&          info, CardModel& out);
 	}
 }

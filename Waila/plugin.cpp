@@ -2,6 +2,7 @@
 #include "plugin_helpers.h"
 #include "plugin_config.h"
 #include "waila_functions.h"
+#include "waila_fields.h"
 #include "UI/ui_manager.h"
 #include "Engine_classes.hpp"
 #include <cstring>
@@ -22,7 +23,9 @@ static PluginInfo s_pluginInfo = {
 	"AlienX",
 	"Minecraft style What Am I Looking At?",
 	PLUGIN_INTERFACE_VERSION,
-	PLUGIN_TARGET_CLIENT
+	PLUGIN_TARGET_CLIENT,
+	PLUGIN_GAME_BUILT_CL,
+	PLUGIN_MAP_MIGRATED
 };
 
 // Global UI manager instance
@@ -80,6 +83,10 @@ extern "C" {
 
 	__declspec(dllexport) bool PluginInit(IPluginSelf* self)
 	{
+		// First, before any early return: off its game build the loader refuses a
+		// plugin whose PluginInit did not take the globals.
+		PluginSdkRuntime::Init(self->hooks);
+
 		try
 		{
 			g_self = self;
@@ -129,12 +136,12 @@ extern "C" {
 				{
 					LOG_DEBUG("PluginInit: registering OnAnyWorldBeginPlay");
 					self->hooks->World->RegisterOnAnyWorldBeginPlay(&OnWorldBeginPlay);
-					LOG_DEBUG("PluginInit: registering OnAfterWorldEndPlay");
+					LOG_DEBUG("PluginInit: registering OnBeforeWorldEndPlay");
 					self->hooks->World->RegisterOnBeforeWorldEndPlay(&OnWorldEndPlay);
 					LOG_DEBUG("PluginInit: world callbacks registered");
 
 					// Hot-reload: if ChimeraMain is already active, activate now
-					SDK::UWorld* currentWorld = SDK::UWorld::GetWorld();
+					SDK::UWorld* currentWorld = PluginSdkRuntime::GetWorld();
 					if (currentWorld)
 					{
 						std::string worldName = currentWorld->GetName();
@@ -179,7 +186,7 @@ extern "C" {
 		if (g_self && g_self->hooks && g_self->hooks->World)
 		{
 			g_self->hooks->World->UnregisterOnAnyWorldBeginPlay(&OnWorldBeginPlay);
-			g_self->hooks->World->UnregisterOnAfterWorldEndPlay(&OnWorldEndPlay);
+			g_self->hooks->World->UnregisterOnBeforeWorldEndPlay(&OnWorldEndPlay);
 			LOG_DEBUG("PluginShutdown: world callbacks unregistered");
 		}
 

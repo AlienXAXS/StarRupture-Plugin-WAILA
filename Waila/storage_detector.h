@@ -5,7 +5,7 @@
 #include <cstdint>
 
 // Forward declare to avoid pulling in heavy SDK headers in this header
-namespace SDK { class AActor; class UAuItemDataBase; class UCrBuildingData; }
+namespace SDK { class AActor; class UAuItemDataBase; class UCrBuildingData; struct FCrItemsStorageContainer; }
 
 namespace Waila
 {
@@ -18,6 +18,12 @@ namespace Waila
 		// Kept so the UI can reach the item's icon without a second lookup.
 		SDK::UAuItemDataBase* itemData = nullptr;
 	};
+
+	// Sums the occupied slots of a storage container per item type, in the order
+	// the types first appear, and counts the slots. Both are added to what the
+	// caller passes in.
+	void ReadStoredItems(const SDK::FCrItemsStorageContainer* container,
+	                     std::vector<StoredItemEntry>& items, int32_t& usedSlots);
 
 	struct StorageInfo
 	{

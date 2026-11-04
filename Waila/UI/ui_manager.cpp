@@ -2,6 +2,7 @@
 #include "plugin_helpers.h"
 #include "plugin_config.h"
 #include "waila_functions.h"
+#include "waila_fields.h"
 #include "UI/icon_cache.h"
 #include "UI/ui_draw.h"
 #include "UI/ui_theme.h"
@@ -135,6 +136,7 @@ namespace Waila::UI
 					m_pendingCard.Clear();
 				}
 				Waila::UI::Icons::Shutdown();
+				Waila::RailDetector::Reset();
 
 				m_self->hooks->UI->UnregisterOnConfigChanged(m_self, &OnConfigChanged);
 			}
@@ -277,6 +279,8 @@ namespace Waila::UI
 			return;
 		}
 
+		RailDetector::SampleRates(deltaSeconds);
+
 
 		Waila::Core::RaycastHit hit;
 		Waila::CrafterInfo  info;
@@ -286,39 +290,54 @@ namespace Waila::UI
 		Waila::CoolerPassiveInfo coolerPassiveInfo;
 		Waila::CargoSenderInfo   cargoSenderInfo;
 		Waila::CargoReceiverInfo cargoReceiverInfo;
+		Waila::RailInfo          railInfo;
 
 		// Perform raycast and extract info immediately (while actor pointer is valid)
 		// PerformRaycast always fills hit.rayStart/rayEnd even on a miss, so we can visualise both cases.
 		bool bHit = m_raycaster.PerformRaycast(m_maxDistance, hit);
 		if (bHit && hit.actor)
 		{
+			// A card whose parts are not all on shows nothing; the hit is still
+			// that kind of building, so it does not fall through to another card.
 			if (Waila::CrafterDetector::IsCrafter(hit.actor))
 			{
-				Waila::CrafterDetector::GetCrafterInfo(hit.actor, info);
+				if (Waila::Features::ShowCrafters())
+					Waila::CrafterDetector::GetCrafterInfo(hit.actor, info);
 			}
 			else if (Waila::StorageDetector::IsStorage(hit.actor))
 			{
-				Waila::StorageDetector::GetStorageInfo(hit.actor, storageInfo);
+				if (Waila::Features::ShowItems())
+					Waila::StorageDetector::GetStorageInfo(hit.actor, storageInfo);
 			}
 			else if (Waila::PowerDetector::IsGenerator(hit.actor))
 			{
-				Waila::PowerDetector::GetPowerInfo(hit.actor, powerInfo);
+				if (Waila::Features::ShowBuildings())
+					Waila::PowerDetector::GetPowerInfo(hit.actor, powerInfo);
 			}
 			else if (Waila::CoolerActiveDetector::IsCoolerActive(hit.actor))
 			{
-				Waila::CoolerActiveDetector::GetCoolerActiveInfo(hit.actor, coolerActiveInfo);
+				if (Waila::Features::ShowBuildings())
+					Waila::CoolerActiveDetector::GetCoolerActiveInfo(hit.actor, coolerActiveInfo);
 			}
 			else if (Waila::CoolerPassiveDetector::IsCoolerPassive(hit.actor))
 			{
-				Waila::CoolerPassiveDetector::GetCoolerPassiveInfo(hit.actor, coolerPassiveInfo);
+				if (Waila::Features::ShowBuildings())
+					Waila::CoolerPassiveDetector::GetCoolerPassiveInfo(hit.actor, coolerPassiveInfo);
 			}
 			else if (Waila::CargoSenderDetector::IsSender(hit.actor))
 			{
-				Waila::CargoSenderDetector::GetSenderInfo(hit.actor, cargoSenderInfo);
+				if (Waila::Features::ShowPackageTransport())
+					Waila::CargoSenderDetector::GetSenderInfo(hit.actor, cargoSenderInfo);
 			}
 			else if (Waila::CargoReceiverDetector::IsReceiver(hit.actor))
 			{
-				Waila::CargoReceiverDetector::GetReceiverInfo(hit.actor, cargoReceiverInfo);
+				if (Waila::Features::ShowItems())
+					Waila::CargoReceiverDetector::GetReceiverInfo(hit.actor, cargoReceiverInfo);
+			}
+			else if (Waila::RailDetector::IsRail(hit.actor))
+			{
+				if (Waila::Features::ShowRailSources() || Waila::Features::ShowDroneRails())
+					Waila::RailDetector::GetRailInfo(hit.actor, railInfo);
 			}
 		}
 
@@ -337,6 +356,7 @@ namespace Waila::UI
 		else if (coolerPassiveInfo.IsValid()) Waila::UI::Card::FromCoolerPassive(coolerPassiveInfo, card);
 		else if (cargoSenderInfo.IsValid())   Waila::UI::Card::FromCargoSender(cargoSenderInfo, card);
 		else if (cargoReceiverInfo.IsValid()) Waila::UI::Card::FromCargoReceiver(cargoReceiverInfo, card);
+		else if (railInfo.IsValid())          Waila::UI::Card::FromRail(railInfo, card);
 
 		// Size the window to exactly what the card will paint, at the current scale.
 		const bool hasCard = card.valid;

@@ -9,6 +9,7 @@
 #include "cooler_passive_detector.h"
 #include "cargo_sender_detector.h"
 #include "cargo_receiver_detector.h"
+#include "rail_detector.h"
 #include "UI/card_model.h"
 #include "Engine_structs.hpp"
 #include <mutex>
