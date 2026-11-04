@@ -14,3 +14,4 @@ Buildings out of render range are named from the game's Mass data instead of rea
 The card follows the camera, so it works from the building drone; Max Distance counts from the drone
 A machine card shows over each ingredient how many it needs per minute at the machine's speed, and under an ingredient the machine is short of, a red "short N/min" and a red outline. N is the need minus what has arrived in the input store over the last minute (measured while you look at the machine, so it needs about 20 seconds of looking before it shows). A machine the game reports as without electricity reads "No power" in its header and blames no ingredient. Figures do not overlap at any ingredient count
 A machine card's output per minute uses the machine's live speed, the same as the ingredient rows, so the two always agree at any speed
+The cargo send timer on the Cargo Sender card and the rail card's send rates work on the game's test branch as well as the public build

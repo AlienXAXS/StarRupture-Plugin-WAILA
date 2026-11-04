@@ -92,7 +92,10 @@ namespace Waila::Fields
 	inline auto ConnectionReceiver       = WAILA_FIELD(FCrPackageTransportConnectionData, Receiver);
 	inline auto ConnectionAmount         = WAILA_FIELD(FCrPackageTransportConnectionData, RequestedAmount);
 	inline auto ConnectionItem           = WAILA_FIELD(FCrPackageTransportConnectionData, Item);
-	inline auto ConnectionStartSendTime  = WAILA_FIELD(FCrPackageTransportConnectionData, StartSendServerTime);
+	// The send start time is a float on one game build and a double on another, so it
+	// is asked for with no size and read by the size the loader reports (see
+	// StartSendTimeOf).
+	inline auto ConnectionStartSendTime  = SR_FIELD_ANY_SIZE(FCrPackageTransportConnectionData, StartSendServerTime, 0);
 	inline auto HelperNetID              = WAILA_FIELD(FCrMassEntityReplicationHelper, NetID);
 	inline auto HelperEntity             = WAILA_FIELD(FCrMassEntityReplicationHelper, Entity);
 	inline auto PlacementSockets         = WAILA_FIELD(UAuActorPlacementSocketsComponent, Sockets);
@@ -155,6 +158,29 @@ namespace Waila::Fields
 		row.size   = result.size;
 		row.offset = 0;
 		return true;
+	}
+
+	// The server time a connection's latest send started, in seconds, read as the
+	// float or double the loader reports the member to be. 0 when it did not
+	// resolve (or Resolve found a size it cannot read), the same as no send yet.
+	inline double StartSendTimeOf(const void* connection)
+	{
+		if (!connection || ConnectionStartSendTime.offset < 0)
+			return 0.0;
+		const uint8_t* at = static_cast<const uint8_t*>(connection) + ConnectionStartSendTime.offset;
+		if (ConnectionStartSendTime.resolvedSize == sizeof(float))
+		{
+			float value;
+			std::memcpy(&value, at, sizeof(value));
+			return value;
+		}
+		if (ConnectionStartSendTime.resolvedSize == sizeof(double))
+		{
+			double value;
+			std::memcpy(&value, at, sizeof(value));
+			return value;
+		}
+		return 0.0;
 	}
 
 	// The elements of a game TArray of structs, stepped by the loader's size for
