@@ -1,0 +1,113 @@
+[size=6][b]WAILA — What Am I Looking At? for StarRupture[/b][/size]
+
+Shows a live card for the building under your crosshair: what it is making, what it holds, its power, cooling and cargo.
+
+[b]Client-side only[/b]
+
+[b]Use it:[/b] look at a building. The card appears while your crosshair is on a supported one. There is nothing to open and no key to press. It works in a loaded save, on foot or from the building drone.
+
+[quote][b]If you encounter issues or just have a question, please discuss this in our Discord which you can find on the [url=https://www.nexusmods.com/starrupture/mods/89]Modloaders Description Page[/url] here on Nexus.[/b][/quote]
+
+[line]
+
+[size=5][b]What It Does[/b][/size]
+
+Inspired by the classic Minecraft WAILA mod. The card shows the building's icon and name, a status, and its description line (optional), then what that kind of building is doing right now.
+
+[list]
+[*][b]Crafters[/b] — the recipe as input tiles leading to the output tile, each with its count. Over each input tile, a figure shows how many it needs per minute at the machine's speed. An input the machine is short of is dimmed with a red outline and a red "short N/min" under it: its need minus what has arrived in the machine's input store over the last minute, measured while you look at the machine, so it takes about 20 seconds of looking before it shows. While it runs, the header counts down to the next item; otherwise it reads Starved, Output full or Idle (no recipe set), and No power when the machine has no electricity (no input is blamed then). Shows output per minute, at the machine's live speed, and the cycle time, plus a speed chip when the machine is not at 1x.
+[*][b]Storage[/b] — up to six item stacks with their counts and how many more kinds there are, slots used out of total, and how full it is. Marked Full or Empty.
+[*][b]Power generators[/b] — grid status (On grid, Switched off, Off grid, or Overdrawn when the grid uses more than it generates), the building's own output, and the grid's generation, use and capacity.
+[*][b]Active and passive coolers[/b] — state (Idle, Working, No fuel or Too hot) and sockets connected out of total.
+[*][b]Cargo senders[/b] — Loading or Sending, how loaded it is, the item being shipped and the send interval.
+[*][b]Cargo receivers[/b] — the stacks and slots held, marked Receiving.
+[*][b]Drone rails[/b] — where a rail's items come from and go to, read from the game's drone logistics, so it works with nothing moving and along the whole line, out of render range too. See Rail card below ✦
+[/list]
+
+[size=5][b]Rail card ✦[/b][/size]
+
+Aim at a drone rail and the card shows what travels along it, item by item. WAILA follows the rails back from the one you point at, through poles, junctions, mergers, storage and stations, to the machines feeding it, then on from the rail's end to every machine taking the items. Drones riding a rail do not get in the way: the aim looks through them to the rail behind.
+
+[b]Header.[/b] The rail's name and what it carries per minute ("Rail v.3  480/min"), then a dot and "From 20 to 4": how many buildings make the items on it and how many take them (a building counts for each item it makes or takes). The dot is:
+[list]
+[*][b]Green[/b] when all is good: the machines asking for an item right now want no more than the rail can bring. For an item only storage supplies, or a Cargo Receiver not yet seen sending, which has no rate to compare, green means the storage holds some or the receiver brings it; a receiver with a measured rate counts like any maker.
+[*][b]Orange[/b] when they want more than the rail can bring: a bottleneck. For an item only storage supplies, when the storage holds none and a machine is asking for it. The item then also gets an orange "Short N/min" line under its To line, and the machines on that line are drawn in the same orange: orange means the takers want more, and N is by how much.
+[*][b]Red[/b] when a machine feeding the rail is starved, short of an input. That machine's name on the From line is red: a red name is a feeder that is short. A kind with both starved and running machines is split, so only the starved ones are red ("Furnace v.2" red, "2x Furnace v.2" plain).
+[*][b]Grey[/b] when there is nothing to judge, for example nothing takes from the rail.
+[/list]
+
+[b]Each item[/b] shows its icon and name, then a bulleted line each for:
+[list]
+[*][b]From[/b] and [b]To[/b]: the buildings making and taking it, buildings of one kind together with their count, the biggest kind first ("From 2x Fabricator v.2, Furnace"; at most three kinds, then "+N more"). A long line continues on the next one. A machine filling a depot reads "From 4x Assembler via Storage Depot v.2", and machines taking from a depot are listed as takers. A Cargo Receiver is listed as a source ("From Cargo Receiver") and a Cargo Sender as a taker, each counted at its own rate (see below).
+[*][b]Stored[/b]: what the storage on the network holds of it ("Stored 18.6k in 3x Storage Depot v.2"), and "Stored 0 in Storage Depot v.2" when the storage on the line is empty of it.
+[/list]
+Under them, in line with the text: [b]min, max, current[/b] per minute, all about the makers feeding the rail. Max is what they make at full speed, capped at what the rail itself carries. Min is what they can make with the inputs they get now, capped the same: a starved maker counts 0, any other its full rate. Current is what is moving now: the smaller of what the makers are putting out right now (a stalled maker puts out nothing) and what the machines asking for the item right now want. The machines taking an item never lower min or max, and current can sit anywhere from 0 to max.
+
+Cargo Receivers and Senders are counted at the rate WAILA measures from their connections: the items in one package over the time between two sends, summed per receiver (what it puts on this rail) and per sender (what it takes off). Until a connection has been seen sending twice the send interval stands in, and one never seen sending reads "?" (a receiver then adds "+?" to the makers' part, or "?" alone). WAILA measures all the time, not just while you aim at a rail. A connection that has stopped sending counts 0 in current, and a receiver whose connections have all stopped counts 0 in min too and is drawn red on the From line.
+
+[b]Using it.[/b] Aim at a rail you suspect is a bottleneck. An orange dot says the takers want more than the rail brings: add a maker or a second rail. A red dot says a feeder is starved: follow the rail back to the makers in "From" and aim at one to see which ingredient it is short of. A current well under max means the takers ask for less than the rail can bring; a current at max with an orange Short line means the rail is full and the takers still want more.
+
+A card shows up to twelve rows, and a long From, To or Stored row can take up to three lines. A rail with nothing linked reads "Nothing connected", and "Rail data not available" when WAILA cannot read the rail's network on this game build.
+
+To move the card, look at a building and open the ModLoader window (F2), then drag the card. It stays where you put it.
+
+[line]
+
+[size=5][b]Installation[/b][/size]
+
+[list=1]
+[*]Download the latest file from the [b]Files[/b] tab
+[*]Open the ZIP file
+[*]Copy the contents of the included Plugins folder into:
+[i]"StarRupture\Binaries\Win64\ModLoader\Plugins"[/i]
+[*]Launch the game once to generate the config file
+[/list]
+
+Requires [url=https://www.nexusmods.com/starrupture/mods/89]AlienX's Mod Loader[/url], the next release after v1.22.x (plugin interface v73 or newer). On an older loader the plugin shows "Needs loader" and stays off.
+
+[line]
+
+[size=5][b]Configuration[/b][/size]
+
+Config file:
+[i]"Plugins\config\Waila.ini"[/i]
+
+Edit it in game on the ModLoader config page (F2). Distance, scale, opacity and descriptions apply as you change them. Hand edits to the file need a restart or RELOAD.
+
+[img]https://raw.githubusercontent.com/{{REPO}}/{{TAG}}/images/config-tab.png[/img]
+
+[list]
+[*]Enabled — turn the plugin on or off (default: true). Read at startup or RELOAD
+[*]Max Distance — how far you can look to detect a building, from you or from the building drone (default: 650, range 0 to 2500)
+[*]Render Building Descriptions — show the description line on the card (default: true)
+[*]Scale — size of the card, 0.5 to 3.0 (default: 1.0). Raise it for 4K displays
+[*]Opacity — opacity of the card background, 0.3 to 1.0 (default: 0.92)
+[/list]
+
+[line]
+
+[size=5][b]Troubleshooting[/b][/size]
+
+[list]
+[*][b]No card[/b] — look straight at a supported building, within Max Distance, in a loaded save. Check that Enabled is on
+[*][b]A rail reads Nothing connected[/b] — no building is linked to the rail's network. Check that the line is joined up to the machines at its ends
+[*][b]Card too small[/b] — raise Scale
+[*][b]Plugin not loading[/b] — check [i]"ModLoader.log in Binaries\Win64\ModLoader\Logs\"[/i]
+[*][b]Issues after a game update[/b] — some features may require a plugin update after major game patches
+[/list]
+
+[line]
+
+[size=5][b]Disclaimer[/b][/size]
+
+Use at your own risk. The authors are not responsible for any damage caused by using this software.
+
+[line]
+
+[size=5][b]Credits[/b][/size]
+
+Original mod by [url=https://github.com/AlienXAXS]@AlienXAXS[/url]
+
+✦ [url=https://github.com/msantoro12]@msantoro12[/url] (maintainer), creator of [url=https://starrupture.goodstuff.software]StarRupture Planner[/url]
+
+The way the cargo connections are read from the package transport replicator follows [url=https://github.com/Mralexandresys/MapExtension_Plugin]MapExtension_Plugin[/url] by Mralexandresys (MIT, Copyright (c) 2026 MapExtension_Plugin contributors)
