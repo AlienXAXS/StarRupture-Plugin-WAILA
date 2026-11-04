@@ -1,0 +1,5 @@
+- Drone rails: aim at a rail to see, per item, where it comes from and goes to, what the storage on the line holds, and its min, max and current rate per minute
+- A rail card's dot shows how the line is doing: green when it keeps up, orange when the machines taking from it want more than it brings, red when a machine feeding it is starved
+- Cargo Receivers and Senders count at a rate measured from their connections
+- Machine cards show what each ingredient needs per minute, the product per minute, and a red "short N/min" under an ingredient the machine is short of; a machine without electricity reads "No power"
+- The card follows the camera, so it works from the building drone, and the aim looks through drones riding a rail
