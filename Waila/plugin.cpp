@@ -34,22 +34,33 @@ static Waila::UI::WailaUIManager* g_uiManager = nullptr;
 // Track whether WAILA is currently active (ChimeraMain is loaded)
 static bool g_isActive = false;
 
+static void Activate()
+{
+	LOG_INFO("ChimeraMain loaded — activating WAILA");
+	LOG_DEBUG("Activate: g_uiManager=%p g_self=%p", g_uiManager, g_self);
+	if (!g_uiManager)
+	{
+		LOG_ERROR("Activate: g_uiManager is null, cannot enable");
+		return;
+	}
+	g_uiManager->Enable(g_self);
+	g_isActive = true;
+	LOG_DEBUG("Activate: WAILA active");
+}
+
 static void OnWorldBeginPlay(SDK::UWorld* world, const char* worldName)
 {
 	LOG_DEBUG("OnWorldBeginPlay: world=%p name=%s", world, worldName ? worldName : "(null)");
 	if (worldName && strcmp(worldName, "ChimeraMain") == 0)
-	{
-		LOG_INFO("ChimeraMain loaded — activating WAILA");
-		LOG_DEBUG("OnWorldBeginPlay: g_uiManager=%p g_self=%p", g_uiManager, g_self);
-		if (!g_uiManager)
-		{
-			LOG_ERROR("OnWorldBeginPlay: g_uiManager is null, cannot enable");
-			return;
-		}
-		g_uiManager->Enable(g_self);
-		g_isActive = true;
-		LOG_DEBUG("OnWorldBeginPlay: WAILA active");
-	}
+		Activate();
+}
+
+// Hot-reload: the world began before we registered for it. The loader calls this
+// on the first tick after we register if ChimeraMain is already running.
+static void OnUIStateChanged(uint64_t /*oldState*/, uint64_t newState, void* /*userData*/)
+{
+	if ((newState & PLUGIN_UI_IN_GAMEPLAY) && !g_isActive)
+		Activate();
 }
 
 static void OnWorldEndPlay(SDK::UWorld* world, const char* worldName)
@@ -140,18 +151,9 @@ extern "C" {
 					self->hooks->World->RegisterOnBeforeWorldEndPlay(&OnWorldEndPlay);
 					LOG_DEBUG("PluginInit: world callbacks registered");
 
-					// Hot-reload: if ChimeraMain is already active, activate now
-					SDK::UWorld* currentWorld = PluginSdkRuntime::GetWorld();
-					if (currentWorld)
-					{
-						std::string worldName = currentWorld->GetName();
-						LOG_DEBUG("PluginInit: current world = '%s'", worldName.c_str());
-						if (worldName == "ChimeraMain")
-						{
-							LOG_INFO("PluginInit: ChimeraMain already active — triggering OnWorldBeginPlay for hot-reload");
-							OnWorldBeginPlay(currentWorld, worldName.c_str());
-						}
-					}
+					// Hot-reload: if ChimeraMain is already active, OnUIStateChanged activates
+					if (self->hooks->GameMenu)
+						self->hooks->GameMenu->RegisterOnUIStateChanged(PLUGIN_UI_IN_GAMEPLAY, &OnUIStateChanged, nullptr);
 				}
 				else
 				{
@@ -189,6 +191,8 @@ extern "C" {
 			g_self->hooks->World->UnregisterOnBeforeWorldEndPlay(&OnWorldEndPlay);
 			LOG_DEBUG("PluginShutdown: world callbacks unregistered");
 		}
+		if (g_self && g_self->hooks && g_self->hooks->GameMenu)
+			g_self->hooks->GameMenu->UnregisterOnUIStateChanged(&OnUIStateChanged, nullptr);
 
 		// Shutdown and delete UI manager (Disable is called internally if active)
 		if (g_uiManager)
