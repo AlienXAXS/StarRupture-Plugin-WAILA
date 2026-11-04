@@ -135,6 +135,10 @@ Engine tick → WailaUIManager::Tick()
 
 This project is provided as-is for modding purposes. See the StarRupture ModLoader documentation for distribution terms.
 
+## Reporting Bugs
+
+Found a bug? [Report it on GitHub](https://github.com/AlienXAXS/StarRupture-Plugin-WAILA/issues) and attach your `ModLoader.log` (in `<game>\StarRupture\Binaries\Win64\ModLoader\Logs\`).
+
 ## Credits
 
 Original mod by [@AlienXAXS](https://github.com/AlienXAXS)
