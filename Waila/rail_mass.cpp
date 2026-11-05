@@ -298,6 +298,30 @@ namespace Waila::RailMass
 			}
 		}
 
+		// Reads every enum value the walk needs, on the first call from the game
+		// thread (they are UObject reads, so not at plugin load). One log line
+		// names the first enum or entry that is missing, and the rail feature
+		// stays off for the session.
+		bool EnumsResolved()
+		{
+			static int state = 0;   // 0 = not tried, 1 = resolved, 2 = failed
+			if (state == 0)
+			{
+				const bool ok =
+					ResolveEnum("ECrMassLogisticsType", "Storage", g_types.storage)
+					&& ResolveEnum("ECrMassLogisticsType", "ProducerConsumer", g_types.both)
+					&& ResolveEnum("ECrMassLogisticsType", "Producer", g_types.producer)
+					&& ResolveEnum("ECrMassLogisticsType", "Consumer", g_types.consumer)
+					&& ResolveEnum("ECrMassLogisticsType", "TransportLineNode", g_types.lineNode)
+					&& ResolveEnum("ECrMassLogisticsType", "TransportLineConnection", g_types.lineConnection)
+					&& ResolveEnum("ECrLogisticsRequestType", "Store", g_requestStore);
+				state = ok ? 1 : 2;
+				if (!ok)
+					LOG_WARN("RailMass: rail sources are off on this build; the rest of WAILA is unaffected");
+			}
+			return state == 1;
+		}
+
 		uintptr_t ResolveFunction(IPluginHookScanner* scanner, const IPluginSelf* self, const char* key,
 			const char* pattern, int32_t followAt)
 		{
@@ -795,20 +819,13 @@ namespace Waila::RailMass
 		bool all = true;
 		for (SizeRow* row : kSizeRows)
 			all = ResolveSize(scanner, self, *row) && all;
-		if (kPersistentSize.size == 0 || kPersistentSize.size > kMaxIdCopy)
+		if (kPersistentSize.size > kMaxIdCopy)
 		{
 			LOG_WARN("RailMass: %s is %u bytes on this build, more than the %u HandleOf copies",
 				kPersistentSize.key, kPersistentSize.size, kMaxIdCopy);
 			all = false;
 		}
 
-		all = ResolveEnum("ECrMassLogisticsType", "Storage", g_types.storage) && all;
-		all = ResolveEnum("ECrMassLogisticsType", "ProducerConsumer", g_types.both) && all;
-		all = ResolveEnum("ECrMassLogisticsType", "Producer", g_types.producer) && all;
-		all = ResolveEnum("ECrMassLogisticsType", "Consumer", g_types.consumer) && all;
-		all = ResolveEnum("ECrMassLogisticsType", "TransportLineNode", g_types.lineNode) && all;
-		all = ResolveEnum("ECrMassLogisticsType", "TransportLineConnection", g_types.lineConnection) && all;
-		all = ResolveEnum("ECrLogisticsRequestType", "Store", g_requestStore) && all;
 
 		for (Member* member : kMembers)
 			all = resolveMember(*member) && all;
@@ -865,7 +882,7 @@ namespace Waila::RailMass
 
 	bool Available()
 	{
-		return g_resolved && g_feature.On() && !g_faulted
+		return g_resolved && g_feature.On() && !g_faulted && EnumsResolved()
 			&& g_getSubsystem && g_getFragment && g_isValid && g_isBuilt && g_getHandle && g_getShared;
 	}
 
