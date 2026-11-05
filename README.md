@@ -37,6 +37,8 @@ and under them, in line with the text, **min · max · current** per minute. All
 
 A card shows up to twelve rows, and a long From, To or Stored row can take up to three lines. A rail with nothing linked reads "Nothing connected", and "Rail data not available" when WAILA cannot read the rail's network on this game build.
 
+**Known issue: rail totals.** The min / max / current totals on the rail card are still being worked on. On some lines, especially ones with splitters, mergers or cargo senders and receivers, the card may not show every machine or the full numbers yet. We know about it and are fixing it.
+
 ## Requirements
 
 - Visual Studio 2022 (MSVC v143, C++20)
