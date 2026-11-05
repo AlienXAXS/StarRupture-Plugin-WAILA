@@ -267,7 +267,7 @@ namespace Waila::RailMass
 		}
 
 		// Values of the game's enums, read by name from the running game
-		// (ECrMassLogisticsType and ECrLogisticsRequestType), set by Resolve.
+		// (ECrMassLogisticsType and ECrLogisticsRequestType), set by EnumsResolved.
 		struct LogisticsTypes
 		{
 			uint8_t storage = 0, both = 0, producer = 0, consumer = 0, lineNode = 0, lineConnection = 0;
