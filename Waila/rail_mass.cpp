@@ -247,6 +247,10 @@ namespace Waila::RailMass
 		constexpr size_t  kMaxWanted = 64;
 		constexpr int32_t kMaxDeliveries = 16;
 
+		// The room HandleOf has for a persistent id on a copy; an id the loader
+		// sizes larger is not copied.
+		constexpr uint32_t kMaxIdCopy = 32;
+
 		bool ResolveSize(IPluginHookScanner* scanner, const IPluginSelf* self, SizeRow& row)
 		{
 			PluginFieldRequest request = PLUGIN_FIELD_REQUEST_INIT;
@@ -256,9 +260,66 @@ namespace Waila::RailMass
 			PluginFieldResult result{};
 			if (!scanner->ResolveField(self, &request, &result))
 				return false;
-			row.size   = result.size;
-			row.offset = 0;
+			row.size         = result.size;
+			row.resolvedSize = result.size;
+			row.offset       = 0;
 			return true;
+		}
+
+		// Values of the game's enums, read by name from the running game
+		// (ECrMassLogisticsType and ECrLogisticsRequestType), set by EnumsResolved.
+		struct LogisticsTypes
+		{
+			uint8_t storage = 0, both = 0, producer = 0, consumer = 0, lineNode = 0, lineConnection = 0;
+		};
+		LogisticsTypes g_types;
+		uint8_t        g_requestStore = 0;
+
+		// One entry's value, or false with a log line naming what is missing.
+		bool ResolveEnum(const char* enumName, const char* entry, uint8_t& out)
+		{
+			int64_t value = 0;
+			switch (PluginMap::EnumValue(enumName, entry, value))
+			{
+			case PluginMap::EnumLookup::Found:
+				if (value >= 0 && value <= 0xFF)
+				{
+					out = static_cast<uint8_t>(value);
+					return true;
+				}
+				LOG_WARN("RailMass: %s::%s is %lld, which does not fit a byte", enumName, entry, static_cast<long long>(value));
+				return false;
+			case PluginMap::EnumLookup::EntryMissing:
+				LOG_WARN("RailMass: enum %s has no entry %s on this build", enumName, entry);
+				return false;
+			default:
+				LOG_WARN("RailMass: enum %s is not loaded on this build", enumName);
+				return false;
+			}
+		}
+
+		// Reads every enum value the walk needs, on the first call from the game
+		// thread (they are UObject reads, so not at plugin load). One log line
+		// names the first enum or entry that is missing, and the rail feature
+		// stays off for the session.
+		bool EnumsResolved()
+		{
+			static int state = 0;   // 0 = not tried, 1 = resolved, 2 = failed
+			if (state == 0)
+			{
+				const bool ok =
+					ResolveEnum("ECrMassLogisticsType", "Storage", g_types.storage)
+					&& ResolveEnum("ECrMassLogisticsType", "ProducerConsumer", g_types.both)
+					&& ResolveEnum("ECrMassLogisticsType", "Producer", g_types.producer)
+					&& ResolveEnum("ECrMassLogisticsType", "Consumer", g_types.consumer)
+					&& ResolveEnum("ECrMassLogisticsType", "TransportLineNode", g_types.lineNode)
+					&& ResolveEnum("ECrMassLogisticsType", "TransportLineConnection", g_types.lineConnection)
+					&& ResolveEnum("ECrLogisticsRequestType", "Store", g_requestStore);
+				state = ok ? 1 : 2;
+				if (!ok)
+					LOG_WARN("RailMass: rail sources are off on this build; the rest of WAILA is unaffected");
+			}
+			return state == 1;
 		}
 
 		uintptr_t ResolveFunction(IPluginHookScanner* scanner, const IPluginSelf* self, const char* key,
@@ -296,8 +357,8 @@ namespace Waila::RailMass
 		// on a copy, so the game's data is left as it was. 0 = no entity.
 		Entity HandleOf(const uint8_t* persistentId, const UWorld* world)
 		{
-			uint8_t copy[32]{};
-			if (!world || kPersistentSize.size > sizeof(copy))
+			uint8_t copy[kMaxIdCopy]{};
+			if (!world || kPersistentSize.size == 0 || kPersistentSize.size > sizeof(copy))
 				return 0;
 			std::memcpy(copy, persistentId, kPersistentSize.size);
 			Handle h{};
@@ -361,14 +422,6 @@ namespace Waila::RailMass
 			return id == -1 ? 0 : static_cast<uint64_t>(static_cast<uint32_t>(id)) + 1;
 		}
 
-		// LogisticsType values (ECrMassLogisticsType) the walk tells apart.
-		constexpr uint8_t kTypeStorage        = 1;
-		constexpr uint8_t kTypeBoth           = 2;   // makes and takes (ProducerConsumer): a Storage Depot v.2 is one
-		constexpr uint8_t kTypeProducer       = 3;   // only makes: a Cargo Receiver is one
-		constexpr uint8_t kTypeConsumer       = 4;   // only takes: a Cargo Sender is one
-		constexpr uint8_t kTypeLineNode       = 5;
-		constexpr uint8_t kTypeLineConnection = 6;
-
 		const uint8_t* SharedFragment(const void* manager, Entity entity, const UScriptStruct* type);
 		void ReadCrafterImpl(Entity building, CrafterState& out);
 
@@ -406,11 +459,12 @@ namespace Waila::RailMass
 			found = true;
 			const uint8_t type = ReadAt<uint8_t>(logistics, mLogisticsType.Offset());
 			using RailNetwork::NodeKind;
-			out.kind = type == kTypeLineNode || type == kTypeLineConnection ? NodeKind::PassThrough
-			         : type == kTypeStorage || (type == kTypeBoth && HoldsStockOnly(manager, node)) ? NodeKind::Storage
+			const LogisticsTypes& t = g_types;
+			out.kind = type == t.lineNode || type == t.lineConnection ? NodeKind::PassThrough
+			         : type == t.storage || (type == t.both && HoldsStockOnly(manager, node)) ? NodeKind::Storage
 			         : NodeKind::Machine;
-			out.role = type == kTypeProducer ? RailNetwork::Role::Producer
-			         : type == kTypeConsumer ? RailNetwork::Role::Consumer
+			out.role = type == t.producer ? RailNetwork::Role::Producer
+			         : type == t.consumer ? RailNetwork::Role::Consumer
 			         : RailNetwork::Role::Other;
 
 			const uint8_t* sockets = Fragment(manager, node, Found(g_socketsStruct, "CrLogisticsSocketsFragment"));
@@ -420,7 +474,9 @@ namespace Waila::RailMass
 			const bool tracks = g_trackResolved && g_trackFeature.On();
 			for (int32_t i = 0; i < list.num; ++i)
 			{
-				const uint8_t* socket = list.data + static_cast<size_t>(i) * kSocketSize.size;
+				const uint8_t* socket = PluginMap::ElementAt(list.data, list.num, i, kSocketSize);
+				if (!socket)
+					break;
 				const Entity rail = ReadAt<Entity>(socket, mSocketRail.Offset());
 				if (!rail || ReadAt<uint8_t>(socket, mSocketType.Offset()) == 0)
 					continue;
@@ -449,11 +505,13 @@ namespace Waila::RailMass
 			view.wanted = item;
 			if (g_requestsResolved && g_requestsFeature.On())
 			{
-				view.store = ReadAt<uint8_t>(data, mRequestType.Offset()) == 1;
+				view.store = ReadAt<uint8_t>(data, mRequestType.Offset()) == g_requestStore;
 				const RawArray runs = ArrayAt(data, mRuntimeData.Offset());
 				for (int32_t i = 0; i < runs.num && i < kMaxDeliveries; ++i)
 				{
-					const uint8_t* run = runs.data + static_cast<size_t>(i) * kRuntimeSize.size;
+					const uint8_t* run = PluginMap::ElementAt(runs.data, runs.num, i, kRuntimeSize);
+					if (!run)
+						break;
 					Delivery delivery;
 					delivery.source      = HandleOf(run + mItemSource.Offset(), world);
 					delivery.destination = HandleOf(run + mItemDestination.Offset(), world);
@@ -476,13 +534,21 @@ namespace Waila::RailMass
 
 			const RawArray pending = ArrayAt(container, mPending.Offset());
 			for (int32_t i = 0; i < pending.num && out.size() < kMaxWanted; ++i)
-				ReadRequestData(pending.data + static_cast<size_t>(i) * kRequestSize.size, world, out);
+			{
+				const uint8_t* data = PluginMap::ElementAt(pending.data, pending.num, i, kRequestSize);
+				if (!data)
+					break;
+				ReadRequestData(data, world, out);
+			}
 
 			const UScriptStruct* requestType = Found(g_requestStruct, "CrLogisticsRequestFragment");
 			const RawArray requests = ArrayAt(container, mRequests.Offset());
 			for (int32_t i = 0; i < requests.num && out.size() < kMaxWanted; ++i)
 			{
-				const Entity entity = HandleOf(requests.data + static_cast<size_t>(i) * kPersistentSize.size, world);
+				const uint8_t* id = PluginMap::ElementAt(requests.data, requests.num, i, kPersistentSize);
+				if (!id)
+					break;
+				const Entity entity = HandleOf(id, world);
 				const uint8_t* request = Fragment(manager, entity, requestType);
 				if (request)
 					ReadRequestData(request + mRequestData.Offset(), world, out);
@@ -753,6 +819,13 @@ namespace Waila::RailMass
 		bool all = true;
 		for (SizeRow* row : kSizeRows)
 			all = ResolveSize(scanner, self, *row) && all;
+		if (kPersistentSize.size > kMaxIdCopy)
+		{
+			LOG_WARN("RailMass: %s is %u bytes on this build, more than the %u HandleOf copies",
+				kPersistentSize.key, kPersistentSize.size, kMaxIdCopy);
+			all = false;
+		}
+
 
 		for (Member* member : kMembers)
 			all = resolveMember(*member) && all;
@@ -809,7 +882,7 @@ namespace Waila::RailMass
 
 	bool Available()
 	{
-		return g_resolved && g_feature.On() && !g_faulted
+		return g_resolved && g_feature.On() && !g_faulted && EnumsResolved()
 			&& g_getSubsystem && g_getFragment && g_isValid && g_isBuilt && g_getHandle && g_getShared;
 	}
 

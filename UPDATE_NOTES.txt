@@ -5,3 +5,4 @@
 - The card follows the camera, so it works from the building drone, and the aim looks through drones riding a rail
 - The cargo send timer on the Cargo Sender card and the rail card's send rates work on every game build the loader knows
 - Aiming at a rail no longer flickers when a drone passes in front of it; the aim now looks through rail drones
+- WAILA now reads the logistics types and struct sizes of rails from the running game, so a game update that renumbers them can't misread a rail
