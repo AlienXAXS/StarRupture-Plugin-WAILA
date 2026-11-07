@@ -18,7 +18,7 @@ namespace Waila::UI
 	// WAILA already holds the exact building, recipe and item objects it needs
 	// icons for, so unlike ProductionViewer there is no asset-registry sweep here
 	// — each brush is resolved the first time it is asked for and cached by
-	// texture pointer thereafter.
+	// the texture's object slot thereafter.
 	//
 	// Everything in here is game-thread only. Resolve during Tick and hand the
 	// finished handles to the render thread inside the card model; never call

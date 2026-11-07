@@ -7,6 +7,9 @@
 #include "AuItems_classes.hpp"
 #include "SlateCore_structs.hpp"
 
+#include "object_ref.h"
+
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -28,10 +31,22 @@ namespace Waila::UI
 		bool g_available = false;
 		bool g_capWarned = false;
 
-		// Null value means "seen, not loadable yet" — the pointer stays in
-		// g_pending until a later Tick manages to register it.
-		std::unordered_map<UTexture2D*, PluginTextureHandle> g_handles;
-		std::unordered_set<UTexture2D*>                      g_pending;
+		struct Entry
+		{
+			// Nothing keeps the texture's package loaded, so it can be freed
+			// between ticks: read it only through Get(). The handle is the
+			// loader's own copy and outlives the texture.
+			ObjectRef<UTexture2D> tex;
+
+			// Null means "seen, not loadable yet" — the slot stays in g_pending
+			// until a later Tick manages to register it.
+			PluginTextureHandle handle = nullptr;
+		};
+
+		// Keyed by the texture's GObjects slot rather than its address. The slot
+		// number is only an identity here and is never turned back into a pointer.
+		std::unordered_map<int32_t, Entry> g_entries;
+		std::unordered_set<int32_t>        g_pending;
 
 		IPluginImGuiTextures* Textures()
 		{
@@ -60,7 +75,7 @@ namespace Waila::UI
 			if (!textures || !tex)
 				return nullptr;
 
-			if (g_handles.size() >= kMaxTextures)
+			if (g_entries.size() >= kMaxTextures)
 			{
 				if (!g_capWarned)
 				{
@@ -77,19 +92,36 @@ namespace Waila::UI
 			return textures->LoadFromUTexture2D(tex, name.c_str());
 		}
 
+		// tex must be live this tick.
 		PluginTextureHandle Resolve(UTexture2D* tex)
 		{
 			if (!g_available || !tex)
 				return nullptr;
 
-			auto it = g_handles.find(tex);
-			if (it != g_handles.end())
-				return it->second;
+			const ObjectRef<UTexture2D> ref(tex);
+			const int32_t               slot = tex->Index;
+
+			auto it = g_entries.find(slot);
+			if (it != g_entries.end())
+			{
+				if (it->second.tex == ref)
+					return it->second.handle;
+
+				// The texture this slot held was freed and another object took
+				// it; the cached icon is the old texture's.
+				if (it->second.handle)
+				{
+					if (IPluginImGuiTextures* textures = Textures())
+						textures->FreeTexture(it->second.handle);
+				}
+				g_pending.erase(slot);
+				g_entries.erase(it);
+			}
 
 			PluginTextureHandle handle = TryLoad(tex);
-			g_handles.emplace(tex, handle);
+			g_entries.emplace(slot, Entry{ ref, handle });
 			if (!handle)
-				g_pending.insert(tex);
+				g_pending.insert(slot);
 
 			return handle;
 		}
@@ -120,14 +152,14 @@ namespace Waila::UI
 	{
 		if (IPluginImGuiTextures* textures = Textures())
 		{
-			for (auto& [tex, handle] : g_handles)
+			for (auto& [slot, entry] : g_entries)
 			{
-				if (handle)
-					textures->FreeTexture(handle);
+				if (entry.handle)
+					textures->FreeTexture(entry.handle);
 			}
 		}
 
-		g_handles.clear();
+		g_entries.clear();
 		g_pending.clear();
 		g_available = false;
 		g_capWarned = false;
@@ -142,22 +174,21 @@ namespace Waila::UI
 		int budget = kRetriesPerTick;
 		for (auto it = g_pending.begin(); it != g_pending.end() && budget > 0; --budget)
 		{
-			UTexture2D* tex = *it;
+			auto entry = g_entries.find(*it);
 
-			bool alive = false;
-			try { alive = tex && UKismetSystemLibrary::IsValid(tex); }
-			catch (...) { alive = false; }
-
-			if (!alive)
+			// A texture the game freed while it waited just loses its icon.
+			UTexture2D* tex = entry != g_entries.end() ? entry->second.tex.Get() : nullptr;
+			if (!tex)
 			{
-				g_handles.erase(tex);
+				if (entry != g_entries.end())
+					g_entries.erase(entry);
 				it = g_pending.erase(it);
 				continue;
 			}
 
 			if (PluginTextureHandle handle = TryLoad(tex))
 			{
-				g_handles[tex] = handle;
+				entry->second.handle = handle;
 				it = g_pending.erase(it);
 			}
 			else
