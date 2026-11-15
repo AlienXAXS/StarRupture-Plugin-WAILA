@@ -248,11 +248,25 @@ namespace Waila::Fields
 		return true;
 	}
 
-	// An item's unique name and its localized name. Empty when unresolved.
+	// An item's key and its localized name. Empty when unresolved.
+	// The key is the unique name, or the asset name (the class name without the
+	// trailing "_C") where the unique name is empty or unset ("None"). Ammo and
+	// the blueprint items have none, and the asset name tells them apart. It is
+	// the same for the default object and for an instance.
 	inline std::string UniqueNameOf(const SDK::UAuItemDataBase* item)
 	{
 		const SDK::FName* name = UniqueItemName.In(static_cast<const void*>(item));
-		return name ? name->ToString() : std::string();
+		if (!name)
+			return std::string();
+
+		std::string unique = name->ToString();
+		if (!unique.empty() && unique != "None")
+			return unique;
+
+		unique = item->Class ? item->Class->GetName() : std::string();
+		if (unique.size() > 2 && unique.compare(unique.size() - 2, 2, "_C") == 0)
+			unique.resize(unique.size() - 2);
+		return unique;
 	}
 
 	inline std::string DisplayNameOf(const SDK::UAuItemDataBase* item)

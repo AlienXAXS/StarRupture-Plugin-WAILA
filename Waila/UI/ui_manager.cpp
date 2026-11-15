@@ -129,13 +129,11 @@ namespace Waila::UI
 			{
 				UnregisterMainWidget();
 
-				// The published model holds texture handles Icons is about to free,
-				// so it has to go first.
+				// No stale card after a reload.
 				{
 					std::lock_guard<std::mutex> lock(m_infoMutex);
 					m_pendingCard.Clear();
 				}
-				Waila::UI::Icons::Shutdown();
 				Waila::RailDetector::Reset();
 
 				m_self->hooks->UI->UnregisterOnConfigChanged(m_self, &OnConfigChanged);
@@ -341,12 +339,9 @@ namespace Waila::UI
 			}
 		}
 
-		// Retry any icons the GPU wasn't ready for on an earlier frame.
-		Waila::UI::Icons::Tick();
-
 		// Fold whatever was detected into the card model. This is the only place
 		// engine pointers are read for display — everything downstream of here is
-		// strings and texture handles, so the render thread can never chase an
+		// strings and image ids, so the render thread can never chase an
 		// actor that has since been destroyed.
 		Waila::UI::CardModel card;
 		if (info.IsValid())                   Waila::UI::Card::FromCrafter(info, card);
@@ -363,7 +358,7 @@ namespace Waila::UI
 		if (hasCard)
 		{
 			float cardW = 0.f, cardH = 0.f;
-			Waila::UI::Card::Measure(card, m_scale, cardW, cardH);
+			Waila::UI::Card::Measure(card, m_scale, m_fontSize.load(), cardW, cardH);
 			UpdateWindowHints(cardW, cardH);
 		}
 
@@ -422,6 +417,10 @@ namespace Waila::UI
 			imgui->GetContentRegionAvail(&aw, &ah);
 			if (aw > 0.f && ah > 0.f)
 				imgui->Dummy(aw, ah);
+
+			// The game thread sizes the window from the font the last frame drew with, so the
+			// first frame of a card shown after a font change is measured at the old font.
+			m_fontSize.store(imgui->GetFontSize());
 
 			const Waila::UI::Palette pal = Waila::UI::Theme::Build(card.accent, m_opacity);
 			const Waila::UI::Rect    rect{ wx, wy, wx + ww, wy + wh };

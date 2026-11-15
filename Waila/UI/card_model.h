@@ -26,7 +26,7 @@ namespace Waila::UI
 	// stack sitting in a container.
 	struct FlowSlot
 	{
-		PluginTextureHandle icon = nullptr;
+		PluginImageId       icon = 0;
 		std::string         label;
 		Health              tone = Health::Idle;
 		bool                dim  = false;   // input the machine is short of
@@ -58,7 +58,7 @@ namespace Waila::UI
 			Health tone  = Health::Idle;
 		};
 
-		PluginTextureHandle icon = nullptr;
+		PluginImageId       icon = 0;
 		std::string         name;
 		bool                wrap = false;   // a long line continues on the next one instead of being cut
 		Lead                lead = Lead::Icon;
@@ -66,7 +66,7 @@ namespace Waila::UI
 	};
 
 	// Everything the card needs for one frame, with every engine pointer already
-	// resolved to a texture handle or a string.
+	// resolved to an image id or a string.
 	//
 	// This is the hand-off between threads: built on the game thread where the
 	// actor is alive, then copied under the manager's mutex and read by the
@@ -76,7 +76,7 @@ namespace Waila::UI
 		bool   valid  = false;
 		Accent accent = Accent::Crafter;
 
-		PluginTextureHandle buildingIcon = nullptr;
+		PluginImageId buildingIcon = 0;
 
 		std::string title;        // building name
 		std::string titleNote;    // muted, right after the title
@@ -115,7 +115,7 @@ namespace Waila::UI
 		void Clear() { *this = CardModel{}; }
 	};
 
-	// Builders. Game thread only — they resolve icons through the cache.
+	// Builders. Game thread only — they name icons to the image library.
 	namespace Card
 	{
 		// Mirrors the config flag. Set by the UI manager -- reading the ini from

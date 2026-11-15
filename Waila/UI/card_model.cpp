@@ -73,7 +73,7 @@ namespace Waila::UI
 			return buf;
 		}
 
-		FlowSlot StockSlot(PluginTextureHandle icon, int32_t count)
+		FlowSlot StockSlot(PluginImageId icon, int32_t count)
 		{
 			FlowSlot slot;
 			slot.icon  = icon;
@@ -361,19 +361,19 @@ namespace Waila::UI
 			lines.head.name = r.displayName;
 			using Lead = RateRow::Lead;
 			if (!r.from.empty())
-				lines.details.push_back({ nullptr, "From " + r.from, true, Lead::Bullet, Spans(r.fromStarved, 5, Health::Bad) });
+				lines.details.push_back({ 0, "From " + r.from, true, Lead::Bullet, Spans(r.fromStarved, 5, Health::Bad) });
 			if (!r.to.empty())
-				lines.details.push_back({ nullptr, "To " + r.to, true, Lead::Bullet, Spans(r.toShort, 3, Health::Warn) });
+				lines.details.push_back({ 0, "To " + r.to, true, Lead::Bullet, Spans(r.toShort, 3, Health::Warn) });
 			if (r.perMinShort > 0.0f)
 			{
 				// Amber like the card's dot, the whole line.
 				const std::string text = "Short " + PerMin(r.perMinShort) + "/min";
-				lines.details.push_back({ nullptr, text, true, Lead::Bullet, { { 0, text.size(), Health::Warn } } });
+				lines.details.push_back({ 0, text, true, Lead::Bullet, { { 0, text.size(), Health::Warn } } });
 			}
 			if (r.stored >= 0 && !r.storedIn.empty())
 			{
 				const int32_t count = static_cast<int32_t>((std::min)(r.stored, static_cast<int64_t>(INT32_MAX)));
-				lines.details.push_back({ nullptr, "Stored " + NumCompact(count) + " in " + r.storedIn, true, Lead::Bullet });
+				lines.details.push_back({ 0, "Stored " + NumCompact(count) + " in " + r.storedIn, true, Lead::Bullet });
 			}
 			// The totals line is indented like the others with nothing in front.
 			lines.totals.lead = Lead::None;

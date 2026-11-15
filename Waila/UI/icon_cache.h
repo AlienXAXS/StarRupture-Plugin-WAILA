@@ -13,30 +13,26 @@ namespace SDK
 
 namespace Waila::UI
 {
-	// Resolves the game's own Slate icons to ImGui texture handles.
+	// Names the game's own icons to the loader's image library.
 	//
 	// WAILA already holds the exact building, recipe and item objects it needs
-	// icons for, so unlike ProductionViewer there is no asset-registry sweep here
-	// — each brush is resolved the first time it is asked for and cached by
-	// the texture's object slot thereafter.
+	// icons for, so each brush's texture is handed to the library the moment it
+	// is read and only the library's integer id is kept. The render callback
+	// turns that id into a texture with hooks->Images->GetSized.
 	//
-	// Everything in here is game-thread only. Resolve during Tick and hand the
-	// finished handles to the render thread inside the card model; never call
-	// these from a render callback.
+	// Game thread only. Call these during Tick when the card model is built,
+	// never from a render callback. 0 means no image.
 	namespace Icons
 	{
+		// Tells the library which sets of images WAILA draws from.
 		void Init();
-		void Shutdown();
 
-		// Retries textures the GPU wasn't ready for on an earlier frame.
-		void Tick();
-
-		PluginTextureHandle ForBuilding(SDK::UCrBuildingData* building);
-		PluginTextureHandle ForRecipe(SDK::UCrItemRecipeData* recipe);
-		PluginTextureHandle ForItem(SDK::UAuItemDataBase* item);
+		PluginImageId ForBuilding(SDK::UCrBuildingData* building);
+		PluginImageId ForRecipe(SDK::UCrItemRecipeData* recipe);
+		PluginImageId ForItem(SDK::UAuItemDataBase* item);
 
 		// Recipe ingredient entries carry the item's class, not an instance —
 		// resolves through the class default object.
-		PluginTextureHandle ForItemClass(SDK::UClass* itemClass);
+		PluginImageId ForItemClass(SDK::UClass* itemClass);
 	}
 }

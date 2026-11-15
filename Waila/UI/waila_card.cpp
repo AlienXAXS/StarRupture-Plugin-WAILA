@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "plugin_images.h"
+
 namespace Waila::UI
 {
 	namespace
@@ -50,8 +52,9 @@ namespace Waila::UI
 		constexpr float  kStockTileMax = kStatRingD;
 
 		// Rate body: a line of text each, the item's lines under its icon and name.
-		constexpr float kRateRowH   = 26.0f;
-		constexpr float kRateIcon   = 22.0f;
+		constexpr float kRateRowH   = 32.0f;
+		constexpr float kRateIcon   = PluginImages::kMinSize;
+		constexpr float kRingIcon   = 0.62f;   // the building icon's share of its ring
 		constexpr float kRateGap    = 10.0f;
 		constexpr float kRateBullet = 2.0f;    // radius of the bullet in front of a detail line
 		constexpr float kRateContH  = 17.0f;   // a wrapped line's continuation
@@ -78,6 +81,35 @@ namespace Waila::UI
 		constexpr float kFontUnit   = 13.0f;
 		constexpr float kFontTiny   = 12.0f;
 		constexpr float kFontStat   = 19.0f;
+
+		// What an icon box measures at this scale and overlay font. Px() is the
+		// icon's size in whole screen pixels: the box at scale s, grown with the
+		// font and never under the library's minimum. Box() is the box in card
+		// points, which grows to fit the icon when the icon outgrows it. Measure()
+		// and Draw() build the same one, so they agree on every size.
+		struct IconScale
+		{
+			float s;
+			float fontSize;
+
+			int Px(float box) const
+			{
+				return static_cast<int>(PluginImages::SizeForFont(box * s, fontSize, PluginImages::kDefaultFontSize));
+			}
+
+			float Box(float box) const
+			{
+				const float need = static_cast<float>(Px(box)) / s;
+				return need > box + 0.5f / s ? need : box;
+			}
+
+			// A ring that holds the building icon: as it was, or larger when the icon needs it.
+			float RingD(float d) const
+			{
+				const float box = Box(d * kRingIcon);
+				return box > d * kRingIcon ? box / kRingIcon : d;
+			}
+		};
 
 		float Clamp01(float v) { return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v); }
 
@@ -143,6 +175,11 @@ namespace Waila::UI
 		struct FlowMetrics
 		{
 			float tile;     // input tile edge
+			int   tilePx;   // the icon in it, in screen pixels
+			float ringD;    // the building's ring
+			int   ringPx;   // the building icon inside it
+			float outD;     // the product's tile
+			int   outPx;    // the icon in it
 			float cellW;    // width of one input cell: the tile, or its figures if wider
 			float rateH;    // height of the figure above each tile
 			float gridW;    // width the cells actually occupy
@@ -154,7 +191,7 @@ namespace Waila::UI
 			float tailW;    // product name / rate column
 		};
 
-		FlowMetrics MeasureFlow(const CardModel& m)
+		FlowMetrics MeasureFlow(const CardModel& m, const IconScale& ic)
 		{
 			const float rows = static_cast<float>(InputRows(m));
 			const size_t used = m.inputs.empty() ? 1 : m.inputs.size();
@@ -170,14 +207,20 @@ namespace Waila::UI
 			const float shortH   = AnyInputShort(m) ? kInShortH : 0.0f;
 			const float byHeight = (kRingD - (rows - 1.0f) * kRowGap) / rows - rateH - shortH;
 
-			f.tile   = Clamp((std::min)(byWidth, byHeight), kTileInMin, kTileInMax);
+			const float tile = Clamp((std::min)(byWidth, byHeight), kTileInMin, kTileInMax);
+			f.tile   = ic.Box(tile);
+			f.tilePx = ic.Px(tile);
+			f.ringD  = ic.RingD(kRingD);
+			f.ringPx = ic.Px(kRingD * kRingIcon);
+			f.outD   = ic.Box(kTileOut);
+			f.outPx  = ic.Px(kTileOut);
 			f.rateH  = rateH;
 			f.shortH = shortH;
 			f.cellW  = InputCellWidth(m, f.tile);
 			f.gridW  = cols * f.cellW + (cols - 1.0f) * kRowGap;
 			f.slotW  = (std::max)(kInGridW, f.gridW);
 			f.stackH = rows * (f.tile + rateH + shortH) + (rows - 1.0f) * kRowGap;
-			f.rowH   = (std::max)(kRingD, f.stackH) + 14.0f;
+			f.rowH   = (std::max)(f.ringD, f.stackH) + 14.0f;
 			f.bodyH  = f.rowH;
 
 			// The tail is as wide as its widest line and no wider — a recipe called
@@ -197,11 +240,11 @@ namespace Waila::UI
 		{
 			float w = f.slotW
 			        + kGap + kArrowW + kGap
-			        + kRingD
+			        + f.ringD
 			        + kGap + kArrowW + kGap
 			        + f.tailW;
 			if (m.hasOutput)
-				w += kTileOut + kGap;
+				w += f.outD + kGap;
 			return w;
 		}
 
@@ -223,13 +266,18 @@ namespace Waila::UI
 			size_t rows  = 0;
 			size_t cols  = 0;
 			float  tile  = 0.0f;
+			int    tilePx = 0;
+			float  ringD = 0.0f;   // the building's ring beside the grid
+			int    ringPx = 0;     // the building icon inside it
 			float  gridW = 0.0f;
 			float  gridH = 0.0f;
 		};
 
-		StockMetrics MeasureStock(const CardModel& m)
+		StockMetrics MeasureStock(const CardModel& m, const IconScale& ic)
 		{
 			StockMetrics st{};
+			st.ringD  = ic.RingD(kStatRingD);
+			st.ringPx = ic.Px(kStatRingD * kRingIcon);
 			const size_t n = m.stock.size();
 			if (n == 0)
 				return st;
@@ -238,8 +286,10 @@ namespace Waila::UI
 			st.cols = (n + st.rows - 1) / st.rows;
 
 			const float rows = static_cast<float>(st.rows);
-			st.tile  = Clamp((kStatRingD - (rows - 1.0f) * kStockGap) / rows,
-			                 kStockTileMin, kStockTileMax);
+			const float tile = Clamp((kStatRingD - (rows - 1.0f) * kStockGap) / rows,
+			                         kStockTileMin, kStockTileMax);
+			st.tile   = ic.Box(tile);
+			st.tilePx = ic.Px(tile);
 			st.gridW = static_cast<float>(st.cols) * st.tile + (static_cast<float>(st.cols) - 1.0f) * kStockGap;
 			st.gridH = rows * st.tile + (rows - 1.0f) * kStockGap;
 			return st;
@@ -247,11 +297,12 @@ namespace Waila::UI
 
 		// The ring sets a floor: the building stays 64pt tall however little sits
 		// beside it, so a storage crate and a generator are the same shape.
-		float StatBodyHeight(const CardModel& m)
+		float StatBodyHeight(const CardModel& m, const IconScale& ic)
 		{
+			const StockMetrics st = MeasureStock(m, ic);
 			const float cells = static_cast<float>(StatRows(m)) * kStatRowH;
-			float h = (std::max)(kStatRingD, cells);
-			h = (std::max)(h, MeasureStock(m).gridH);
+			float h = (std::max)(st.ringD, cells);
+			h = (std::max)(h, st.gridH);
 			return h + 6.0f;
 		}
 
@@ -275,14 +326,14 @@ namespace Waila::UI
 
 		// Ring, then the figures, then the stock grid — all on one line, so the card
 		// grows sideways as a container fills rather than downwards.
-		float StatBodyWidth(const CardModel& m)
+		float StatBodyWidth(const CardModel& m, const IconScale& ic)
 		{
-			float w = kStatRingD;
+			const StockMetrics st = MeasureStock(m, ic);
+			float w = st.ringD;
 
 			if (!m.stats.empty())
 				w += kStatSpace + static_cast<float>(StatCols(m)) * StatCellWidth(m);
 
-			const StockMetrics st = MeasureStock(m);
 			if (st.cols > 0)
 				w += kStatSpace + st.gridW + StockTailWidth(m);
 
@@ -299,10 +350,10 @@ namespace Waila::UI
 			return w;
 		}
 
-		float RateBodyWidth(const CardModel& m)
+		float RateBodyWidth(const CardModel& m, const IconScale& ic)
 		{
 			const float nameW = RateNameWidth(m);
-			return m.rates.empty() ? nameW : kRateIcon + kRateGap + nameW;
+			return m.rates.empty() ? nameW : ic.Box(kRateIcon) + kRateGap + nameW;
 		}
 
 		// A card narrower than its own title is worse than a card with air in it.
@@ -377,11 +428,11 @@ namespace Waila::UI
 			size_t      start = 0;
 		};
 
-		std::vector<RowLine> RowLines(const RateRow& row, float cardW)
+		std::vector<RowLine> RowLines(const RateRow& row, float cardW, const IconScale& ic)
 		{
 			if (!row.wrap)
 				return { { row.name, 0 } };
-			const float textW = cardW - kPadX * 2.0f - kRateIcon - kRateGap;
+			const float textW = cardW - kPadX * 2.0f - ic.Box(kRateIcon) - kRateGap;
 			std::vector<std::string> texts;
 			std::vector<size_t>      starts;
 			WrapDescription(row.name, textW, &texts, kFontLabel, kRateChar, 1, &starts);
@@ -401,12 +452,18 @@ namespace Waila::UI
 			return lines;
 		}
 
-		float RateBodyHeight(const CardModel& m, float cardW)
+		// A rate row is as tall as it was, or as its icon if that is taller.
+		float RateRowH(const IconScale& ic)
+		{
+			return (std::max)(kRateRowH, ic.Box(kRateIcon));
+		}
+
+		float RateBodyHeight(const CardModel& m, float cardW, const IconScale& ic)
 		{
 			float h = 0.0f;
 			for (const auto& row : m.rates)
-				h += kRateRowH + static_cast<float>(RowLines(row, cardW).size() - 1) * kRateContH;
-			return (std::max)(h, kRateRowH) + 6.0f;
+				h += RateRowH(ic) + static_cast<float>(RowLines(row, cardW, ic).size() - 1) * kRateContH;
+			return (std::max)(h, RateRowH(ic)) + 6.0f;
 		}
 
 		bool HasFooter(const CardModel& m)
@@ -419,19 +476,30 @@ namespace Waila::UI
 	// Measure
 	// -------------------------------------------------------------------------
 
-	void Card::Measure(const CardModel& model, float scale, float& outWidth, float& outHeight)
+	void Card::Measure(const CardModel& model, float scale, float fontSize, float& outWidth, float& outHeight)
 	{
-		const FlowMetrics f = MeasureFlow(model);
+		const IconScale ic{ scale, fontSize };
+		const FlowMetrics f = MeasureFlow(model, ic);
 
-		const float bodyW = model.hasFlow  ? FlowGroupWidth(model, f)
-		                 : model.hasRates ? RateBodyWidth(model)
-		                 : StatBodyWidth(model);
-		const float baseW = Clamp((std::max)(bodyW, HeaderWidth(model)) + kPadX * 2.0f,
-		                          kCardMinW, kCardMaxW);
+		const auto bodyWidth = [&model](const IconScale& at, const FlowMetrics& fm)
+		{
+			return model.hasFlow  ? FlowGroupWidth(model, fm)
+			     : model.hasRates ? RateBodyWidth(model, at)
+			     : StatBodyWidth(model, at);
+		};
+
+		// Icons that grow with the font widen the body, so the cap grows by the same
+		// amount; otherwise a large font pushes the equation past the window edge.
+		const IconScale base{ scale, PluginImages::kDefaultFontSize };
+		const float grown = bodyWidth(ic, f) - bodyWidth(base, MeasureFlow(model, base));
+		const float maxW  = kCardMaxW + (std::max)(0.0f, grown);
+
+		const float baseW = Clamp((std::max)(bodyWidth(ic, f), HeaderWidth(model)) + kPadX * 2.0f,
+		                          kCardMinW, maxW);
 
 		float h = kStrip + kHeaderH;
 
-		h += model.hasFlow ? f.bodyH : model.hasRates ? RateBodyHeight(model, baseW) : StatBodyHeight(model);
+		h += model.hasFlow ? f.bodyH : model.hasRates ? RateBodyHeight(model, baseW, ic) : StatBodyHeight(model, ic);
 
 		if (HasFooter(model))
 			h += kFooterH;
@@ -506,9 +574,10 @@ namespace Waila::UI
 		}
 
 		void DrawFlowBody(IModLoaderImGui* ui, PluginDrawList dl, const CardModel& m,
-		                  const Palette& pal, float s, const Rect& r, float bodyTop)
+		                  const Palette& pal, const IconScale& ic, const Rect& r, float bodyTop)
 		{
-			const FlowMetrics f = MeasureFlow(m);
+			const float s = ic.s;
+			const FlowMetrics f = MeasureFlow(m, ic);
 			const float cy = bodyTop + f.rowH * s * 0.5f;
 
 			// The card is sized to the equation, so this normally lands flush with
@@ -532,7 +601,7 @@ namespace Waila::UI
 				const float ty = gridY + (rateH + f.tile + f.shortH + kRowGap) * s * static_cast<float>(i / kInCols) + rateH * s;
 
 				const Rect tile = { tx, ty, tx + f.tile * s, ty + f.tile * s };
-				Draw::IconTile(ui, dl, tile, in.icon, pal, rounding * s, in.dim ? 0.45f : 1.0f, true);
+				Draw::IconTile(ui, dl, tile, f.tilePx, in.icon, pal, rounding * s, in.dim ? 0.45f : 1.0f, true);
 
 				const float midX = cellX + f.cellW * 0.5f * s;
 
@@ -564,7 +633,7 @@ namespace Waila::UI
 			x += (kArrowW + kGap) * s;
 
 			// ── The building, wearing its own progress ───────────────────────
-			const float ringR = kRingD * 0.5f * s;
+			const float ringR = f.ringD * 0.5f * s;
 			const float ringX = x + ringR;
 
 			const Color ringFill = m.status == Health::Bad ? pal.bad : pal.accent;
@@ -572,11 +641,11 @@ namespace Waila::UI
 				m.progressValid ? Clamp01(m.progress) : 0.0f,
 				pal.accentDim.WithAlpha(0.45f), ringFill);
 
-			const float iconHalf = ringR * 0.62f;
+			const float iconHalf = static_cast<float>(f.ringPx) * 0.5f;
 			const Rect  iconRect = { ringX - iconHalf, cy - iconHalf, ringX + iconHalf, cy + iconHalf };
-			Draw::IconBare(ui, dl, iconRect, m.buildingIcon, pal, 1.0f);
+			Draw::IconBare(ui, dl, iconRect, f.ringPx, m.buildingIcon, pal, 1.0f);
 
-			x += (kRingD + kGap) * s;
+			x += (f.ringD + kGap) * s;
 
 			Draw::Arrow(ui, dl, x + kArrowW * s * 0.5f, cy, kArrowW * s * 0.8f,
 				pal.textFaint, 1.6f * s);
@@ -585,14 +654,14 @@ namespace Waila::UI
 			// ── Output ───────────────────────────────────────────────────────
 			if (m.hasOutput)
 			{
-				const Rect tile = { x, cy - kTileOut * s * 0.5f, x + kTileOut * s, cy + kTileOut * s * 0.5f };
-				Draw::IconTile(ui, dl, tile, m.output.icon, pal, 10.0f * s, 1.0f, true);
+				const Rect tile = { x, cy - f.outD * s * 0.5f, x + f.outD * s, cy + f.outD * s * 0.5f };
+				Draw::IconTile(ui, dl, tile, f.outPx, m.output.icon, pal, 10.0f * s, 1.0f, true);
 
 				if (!m.output.label.empty())
 					Draw::CountBadge(ui, dl, tile, m.output.label.c_str(), pal.textPrimary,
-						Draw::CountBadgeFont(kTileOut * s));
+						Draw::CountBadgeFont(f.outD * s));
 
-				x += (kTileOut + kGap) * s;
+				x += (f.outD + kGap) * s;
 			}
 
 			// ── What it makes, and how fast ──────────────────────────────────
@@ -637,19 +706,20 @@ namespace Waila::UI
 		}
 
 		void DrawStatBody(IModLoaderImGui* ui, PluginDrawList dl, const CardModel& m,
-		                  const Palette& pal, float s, const Rect& r, float bodyTop)
+		                  const Palette& pal, const IconScale& ic, const Rect& r, float bodyTop)
 		{
+			const float s    = ic.s;
 			const float left = r.x0 + kPadX * s;
 
-			const StockMetrics st = MeasureStock(m);
+			const StockMetrics st = MeasureStock(m, ic);
 
 			const float cellsH   = static_cast<float>(StatRows(m)) * kStatRowH * s;
-			const float blockH   = (StatBodyHeight(m) - 6.0f) * s;
+			const float blockH   = (StatBodyHeight(m, ic) - 6.0f) * s;
 			const float blockMid = bodyTop + blockH * 0.5f;
 
 			// ── The building, in the same ring the flow body gives it ────────
 			// Progress reads as fullness or grid load for buildings with no cycle.
-			const float ringR = kStatRingD * 0.5f * s;
+			const float ringR = st.ringD * 0.5f * s;
 			const float ringX = left + ringR;
 
 			Draw::Ring(ui, dl, ringX, blockMid, ringR - kRingThick * 0.5f * s, kRingThick * s,
@@ -657,12 +727,12 @@ namespace Waila::UI
 				pal.accentDim.WithAlpha(0.45f),
 				m.status == Health::Bad ? pal.bad : pal.accent);
 
-			const float iconHalf = ringR * 0.62f;
+			const float iconHalf = static_cast<float>(st.ringPx) * 0.5f;
 			Draw::IconBare(ui, dl, { ringX - iconHalf, blockMid - iconHalf,
 			                         ringX + iconHalf, blockMid + iconHalf },
-				m.buildingIcon, pal, 1.0f);
+				st.ringPx, m.buildingIcon, pal, 1.0f);
 
-			float x = left + kStatRingD * s;
+			float x = left + st.ringD * s;
 
 			// ── The figures, beside the ring ─────────────────────────────────
 			if (!m.stats.empty())
@@ -708,7 +778,7 @@ namespace Waila::UI
 
 					// The stack's own count rides its icon, the way a recipe's
 					// ingredients carry theirs — no second row of figures.
-					Draw::IconTile(ui, dl, tile, m.stock[i].icon, pal, rounding * s, 1.0f, true);
+					Draw::IconTile(ui, dl, tile, st.tilePx, m.stock[i].icon, pal, rounding * s, 1.0f, true);
 					if (!m.stock[i].label.empty())
 						Draw::CountBadge(ui, dl, tile, m.stock[i].label.c_str(),
 							pal.textPrimary, badgeFont);
@@ -765,41 +835,44 @@ namespace Waila::UI
 		}
 
 		void DrawRateBody(IModLoaderImGui* ui, PluginDrawList dl, const CardModel& m,
-		                  const Palette& pal, float s, const Rect& r, float bodyTop)
+		                  const Palette& pal, const IconScale& ic, const Rect& r, float bodyTop)
 		{
+			const float s        = ic.s;
+			const float rateBox  = ic.Box(kRateIcon);
+			const float rateRowH = RateRowH(ic);
 			const float left  = r.x0 + kPadX * s;
 			const float right = r.x1 - kPadX * s;
 
 			if (m.rates.empty())
 			{
-				Draw::TextAt(ui, dl, left, bodyTop + (kRateRowH - kFontLabel) * 0.5f * s,
+				Draw::TextAt(ui, dl, left, bodyTop + (rateRowH - kFontLabel) * 0.5f * s,
 					m.ratesNote.c_str(), pal.textMuted, kFontLabel * s);
 				return;
 			}
 
-			const float nameMaxW = right - (left + (kRateIcon + kRateGap) * s);
+			const float nameMaxW = right - (left + (rateBox + kRateGap) * s);
 
 			float y = bodyTop;
 			for (const RateRow& row : m.rates)
 			{
-				const float midY = y + kRateRowH * 0.5f * s;
+				const float midY = y + rateRowH * 0.5f * s;
 				const float textY = midY - kFontLabel * 0.5f * s;
 
 				if (row.lead == RateRow::Lead::Icon)
-					Draw::IconBare(ui, dl, { left, midY - kRateIcon * 0.5f * s,
-					                         left + kRateIcon * s, midY + kRateIcon * 0.5f * s },
-						row.icon, pal, 1.0f);
+					Draw::IconBare(ui, dl, { left, midY - rateBox * 0.5f * s,
+					                         left + rateBox * s, midY + rateBox * 0.5f * s },
+						ic.Px(kRateIcon), row.icon, pal, 1.0f);
 				else if (row.lead == RateRow::Lead::Bullet)
-					Draw::StatusDot(ui, dl, left + kRateIcon * 0.5f * s, midY, kRateBullet * s, pal.textPrimary, 0.0f);
+					Draw::StatusDot(ui, dl, left + rateBox * 0.5f * s, midY, kRateBullet * s, pal.textPrimary, 0.0f);
 
-				const std::vector<RowLine> lines = RowLines(row, (r.x1 - r.x0) / s);
+				const std::vector<RowLine> lines = RowLines(row, (r.x1 - r.x0) / s, ic);
 				for (size_t k = 0; k < lines.size(); ++k)
 				{
 					const float indent = k ? kRateIndent * s : 0.0f;
-					DrawRateText(ui, dl, row, lines[k], pal, left + (kRateIcon + kRateGap) * s + indent,
+					DrawRateText(ui, dl, row, lines[k], pal, left + (rateBox + kRateGap) * s + indent,
 						textY + kRateContH * s * static_cast<float>(k), nameMaxW - indent, kFontLabel * s);
 				}
-				y += (kRateRowH + kRateContH * static_cast<float>(lines.size() - 1)) * s;
+				y += (rateRowH + kRateContH * static_cast<float>(lines.size() - 1)) * s;
 			}
 		}
 	}
@@ -810,7 +883,8 @@ namespace Waila::UI
 		if (!ui || !model.valid)
 			return;
 
-		const float s = scale;
+		const float      s = scale;
+		const IconScale ic{ scale, ui->GetFontSize() };
 
 		Draw::Panel(ui, dl, rect, pal, kRounding * s, kStrip * s);
 
@@ -819,18 +893,18 @@ namespace Waila::UI
 
 		if (model.hasFlow)
 		{
-			DrawFlowBody(ui, dl, model, pal, s, rect, bodyTop);
-			bodyTop += MeasureFlow(model).bodyH * s;
+			DrawFlowBody(ui, dl, model, pal, ic, rect, bodyTop);
+			bodyTop += MeasureFlow(model, ic).bodyH * s;
 		}
 		else if (model.hasRates)
 		{
-			DrawRateBody(ui, dl, model, pal, s, rect, bodyTop);
-			bodyTop += RateBodyHeight(model, (rect.x1 - rect.x0) / s) * s;
+			DrawRateBody(ui, dl, model, pal, ic, rect, bodyTop);
+			bodyTop += RateBodyHeight(model, (rect.x1 - rect.x0) / s, ic) * s;
 		}
 		else
 		{
-			DrawStatBody(ui, dl, model, pal, s, rect, bodyTop);
-			bodyTop += StatBodyHeight(model) * s;
+			DrawStatBody(ui, dl, model, pal, ic, rect, bodyTop);
+			bodyTop += StatBodyHeight(model, ic) * s;
 		}
 
 		if (HasFooter(model))

@@ -1,5 +1,7 @@
 #include "ui_draw.h"
+#include "plugin_helpers.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -71,8 +73,8 @@ namespace Waila::UI
 			thickness * 0.62f, Theme::Pack(fill), 12);
 	}
 
-	void Draw::IconTile(IModLoaderImGui* ui, PluginDrawList dl, const Rect& r,
-	                    PluginTextureHandle tex, const Palette& pal, float rounding,
+	void Draw::IconTile(IModLoaderImGui* ui, PluginDrawList dl, const Rect& r, int px,
+	                    PluginImageId image, const Palette& pal, float rounding,
 	                    float alpha, bool drawSlot)
 	{
 		if (drawSlot)
@@ -85,12 +87,22 @@ namespace Waila::UI
 				PluginDrawFlags_RoundCornersAll, 1.0f);
 		}
 
-		IconBare(ui, dl, r, tex, pal, alpha);
+		IconBare(ui, dl, r, px, image, pal, alpha);
 	}
 
-	void Draw::IconBare(IModLoaderImGui* ui, PluginDrawList dl, const Rect& r,
-	                    PluginTextureHandle tex, const Palette& pal, float alpha)
+	void Draw::IconBare(IModLoaderImGui* ui, PluginDrawList dl, const Rect& r, int px,
+	                    PluginImageId image, const Palette& pal, float alpha)
 	{
+		// GetSized is valid for this frame only: it goes straight into the draw
+		// list and is never kept. Once the loader has a copy made for this size
+		// it is the copy, to be drawn 1:1 into the same rectangle; until then it
+		// is the stored picture, scaled into it.
+		IPluginHooks*       hooks = GetHooks();
+		PluginTextureHandle tex   = nullptr;
+		if (image && hooks && hooks->Images)
+		{
+			tex = hooks->Images->GetSized(image, px, nullptr, nullptr);
+		}
 		if (tex)
 		{
 			ui->DL_AddImage(dl, tex, r.x0, r.y0, r.x1, r.y1, 0.0f, 0.0f, 1.0f, 1.0f,
@@ -98,7 +110,7 @@ namespace Waila::UI
 			return;
 		}
 
-		// No texture yet (or the asset has none) — a dimmed accent lozenge keeps the
+		// No image yet (or the asset has none) — a dimmed accent lozenge keeps the
 		// slot occupied so nothing reflows once the real icon arrives.
 		const float inset = (r.x1 - r.x0) * 0.22f;
 		ui->DL_AddRectFilled(dl, r.x0 + inset, r.y0 + inset, r.x1 - inset, r.y1 - inset,

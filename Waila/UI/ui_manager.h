@@ -12,6 +12,7 @@
 #include "rail_detector.h"
 #include "UI/card_model.h"
 #include "Engine_structs.hpp"
+#include <atomic>
 #include <mutex>
 #include <string>
 
@@ -63,6 +64,7 @@ namespace Waila::UI
 
 		// Card presentation, refreshed from config on change.
 		float m_scale            = 1.f;
+		std::atomic<float> m_fontSize{ 15.f };   // the overlay font, as RenderWidget last saw it
 		float m_opacity          = 0.92f;
 		bool  m_showDescriptions = true;
 
