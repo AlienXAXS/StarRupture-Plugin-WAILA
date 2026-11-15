@@ -42,13 +42,27 @@ A card shows up to twelve rows, and a long From, To or Stored row can take up to
 ## Requirements
 
 - Visual Studio 2022 (MSVC v143, C++20)
-- [StarRupture-Game-SDK](https://github.com/AlienXAXS/StarRupture-Game-SDK)
 - [StarRupture-Plugin-SDK](https://github.com/AlienXAXS/StarRupture-Plugin-SDK)
 - StarRupture with ModLoader v1.23.0 or later installed
 
 ## Building
 
-Open `StarRupture-Plugin-Waila.sln` in Visual Studio 2022 and build, or use MSBuild from the repository root:
+Put the plugin next to `StarRupture-Plugin-SDK` and clone both with `--recursive`, so the game SDK submodules come along:
+
+```
+git clone --recursive https://github.com/AlienXAXS/StarRupture-Plugin-SDK.git
+git clone --recursive https://github.com/AlienXAXS/StarRupture-Plugin-WAILA.git
+```
+
+```
+<parent folder>/
+├── StarRupture-Plugin-SDK/
+└── StarRupture-Plugin-WAILA/
+```
+
+The game SDK comes from this plugin's own `StarRupture SDK` submodule when it has one, otherwise from the Plugin SDK's. To build against other folders, pass `/p:PluginSDKInclude=...` and `/p:GameSDKRoot=...` to msbuild.
+
+Then open `StarRupture-Plugin-Waila.sln` in Visual Studio 2022 and build, or use MSBuild from the repository root:
 
 ```bat
 msbuild StarRupture-Plugin-Waila.sln /p:Configuration="Client Debug" /p:Platform=x64
@@ -66,8 +80,6 @@ Output is placed at `build/<Configuration>/Plugins/Waila.dll`.
 | `Server Release` | Optimised server-side build |
 | `Local SDK Client Debug/Release` | Client build using a local SDK checkout |
 | `Local SDK Server Debug/Release` | Server build using a local SDK checkout |
-
-SDK checkout paths can be adjusted in [`Shared.props`](Shared.props) to match your local directory layout.
 
 ## Installation
 
