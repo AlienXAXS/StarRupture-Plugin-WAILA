@@ -44,7 +44,7 @@ A card shows up to twelve rows, and a long From, To or Stored row can take up to
 
 - Visual Studio 2022 (MSVC v143, C++20)
 - [StarRupture-Plugin-SDK](https://github.com/AlienXAXS/StarRupture-Plugin-SDK)
-- StarRupture with ModLoader v1.24.0 or later installed
+- StarRupture with ModLoader 1.24.0 or newer installed
 
 ## Building
 

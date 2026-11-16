@@ -42,7 +42,7 @@ Aim at a drone rail and the card shows what travels along it, item by item. WAIL
 [*][b]Grey[/b] when there is nothing to judge, for example nothing takes from the rail.
 [/list]
 
-[b]Each item[/b] shows its icon and name, then a bulleted line each for:
+[b]Each item[/b] shows its icon and name (Ammo and each blueprint count as separate items), then a bulleted line each for:
 [list]
 [*][b]From[/b] and [b]To[/b]: the buildings making and taking it, buildings of one kind together with their count, the biggest kind first ("From 2x Fabricator v.2, Furnace"; at most three kinds, then "+N more"). A long line continues on the next one. A machine filling a depot reads "From 4x Assembler via Storage Depot v.2", and machines taking from a depot are listed as takers. A Cargo Receiver is listed as a source ("From Cargo Receiver") and a Cargo Sender as a taker, each counted at its own rate (see below).
 [*][b]Stored[/b]: what the storage on the network holds of it ("Stored 18.6k in 3x Storage Depot v.2"), and "Stored 0 in Storage Depot v.2" when the storage on the line is empty of it.
@@ -71,7 +71,9 @@ To move the card, look at a building and open the ModLoader window (F2), then dr
 [*]Launch the game once to generate the config file
 [/list]
 
-Requires [url=https://www.nexusmods.com/starrupture/mods/89]AlienX's Mod Loader[/url], v1.23.0 or later (plugin interface v75). On an older loader the plugin shows "Needs loader" and stays off.
+Requires [url=https://www.nexusmods.com/starrupture/mods/89]AlienX's Mod Loader[/url]: ModLoader 1.24.0 or newer. On an older loader the plugin shows "Needs loader" and stays off.
+
+The icons on the card come from the loader's image library, which is part of that loader release. Icons are drawn sharper, and the item icons on a drone rail card are larger so they are easier to read. Icons also follow the overlay font size, and the card widens to fit them.
 
 [line]
 
