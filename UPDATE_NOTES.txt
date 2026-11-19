@@ -2,4 +2,4 @@
 - Card icons now come from the ModLoader's image library instead of WAILA's own icon cache. Cards keep their layout while an icon loads. This version needs ModLoader 1.24.0 or newer
 - A storage or rail holding Ammo and blueprint items now lists each as its own item instead of adding them together
 - Card icons now grow with the overlay font size, and the card widens to fit them
-- A machine card shows the item a recipe makes with that item's own icon, so Sulphuric Acid is no longer drawn with the Battery's icon
+- A machine card shows the item a recipe makes with that item's own icon, so Sulfuric Acid is no longer drawn with the Battery's icon
