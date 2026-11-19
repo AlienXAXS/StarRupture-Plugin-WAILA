@@ -187,13 +187,12 @@ namespace Waila::UI
 		if (info.recipeOutput.IsValid())
 		{
 			out.hasOutput = true;
-			out.output.icon = Icons::ForRecipe(info.recipeDataPtr);
-			if (!out.output.icon)
-			{
-				out.output.icon = info.recipeOutput.itemData
-					? Icons::ForItem(info.recipeOutput.itemData)
-					: Icons::ForItemClass(info.recipeOutput.itemClass);
-			}
+			// The item's own icon, as on the storage card. The recipe's own icon is
+			// not used: some recipes carry another item's icon (the Sulphuric Acid
+			// recipe carries the Battery's) and the alternate ones carry arrows.
+			out.output.icon = info.recipeOutput.itemData
+				? Icons::ForItem(info.recipeOutput.itemData)
+				: Icons::ForItemClass(info.recipeOutput.itemClass);
 
 			// Always badged, even at 1 — a bare product tile in a row of counted
 			// ingredients reads as an icon whose number failed to load.

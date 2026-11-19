@@ -5,7 +5,7 @@
 #include <vector>
 
 // Forward declare to avoid pulling in heavy SDK headers in this header
-namespace SDK { class AActor; class UClass; class UCrItemRecipeData; class UAuItemRecipeData; class UAuItemDataBase; class UCrBuildingData; }
+namespace SDK { class AActor; class UClass; class UAuItemRecipeData; class UAuItemDataBase; class UCrBuildingData; }
 
 namespace Waila
 {
@@ -51,9 +51,6 @@ namespace Waila
 		// Empty while the crafter is idle.
 		std::vector<RecipeItemEntry> recipeInputs;
 		RecipeItemEntry              recipeOutput;
-
-		// Populated for clipboard/paste use — null when building is idle
-		SDK::UCrItemRecipeData* recipeDataPtr = nullptr;
 
 		// Building definition the icon in the ring centre comes from. Null when
 		// PlacementData is missing or is not a building definition.

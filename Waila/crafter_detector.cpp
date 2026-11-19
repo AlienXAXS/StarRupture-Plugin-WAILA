@@ -215,10 +215,6 @@ namespace Waila
 					outInfo.currentRecipeDisplayName = Fields::DisplayNameOf(itemData);
 				}
 
-				// Store typed recipe pointer for the output icon (UCrItemRecipeData extends UAuItemRecipeData)
-				if (first.recipe->IsA(UCrItemRecipeData::StaticClass()))
-					outInfo.recipeDataPtr = static_cast<UCrItemRecipeData*>(first.recipe);
-
 				// Recipe inputs and output. The have-counts come from the crafter's
 				// own input store, so a starved machine can be spotted without
 				// opening it.

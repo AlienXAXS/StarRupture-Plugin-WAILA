@@ -69,19 +69,6 @@ namespace Waila::UI
 		return ResolveBrush(Fields::IconOf(building));
 	}
 
-	PluginImageId Icons::ForRecipe(UCrItemRecipeData* recipe)
-	{
-		if (!Images() || !recipe || !UKismetSystemLibrary::IsValid(recipe))
-			return 0;
-
-		// A recipe carries its own presentation icon; fall back to the item it
-		// produces when the recipe brush is empty.
-		if (PluginImageId id = ResolveBrush(Fields::IconOf(recipe)))
-			return id;
-
-		return ForItem(recipe->GetItemDataBase());
-	}
-
 	PluginImageId Icons::ForItem(UAuItemDataBase* item)
 	{
 		if (!Images() || !item || !UKismetSystemLibrary::IsValid(item))

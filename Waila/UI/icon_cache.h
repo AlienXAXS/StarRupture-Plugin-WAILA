@@ -7,7 +7,6 @@ namespace SDK
 	class UClass;
 	class UTexture2D;
 	class UCrBuildingData;
-	class UCrItemRecipeData;
 	class UAuItemDataBase;
 }
 
@@ -15,7 +14,7 @@ namespace Waila::UI
 {
 	// Names the game's own icons to the loader's image library.
 	//
-	// WAILA already holds the exact building, recipe and item objects it needs
+	// WAILA already holds the exact building and item objects it needs
 	// icons for, so each brush's texture is handed to the library the moment it
 	// is read and only the library's integer id is kept. The render callback
 	// turns that id into a texture with hooks->Images->GetSized.
@@ -28,7 +27,6 @@ namespace Waila::UI
 		void Init();
 
 		PluginImageId ForBuilding(SDK::UCrBuildingData* building);
-		PluginImageId ForRecipe(SDK::UCrItemRecipeData* recipe);
 		PluginImageId ForItem(SDK::UAuItemDataBase* item);
 
 		// Recipe ingredient entries carry the item's class, not an instance —

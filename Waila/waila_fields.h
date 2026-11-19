@@ -60,7 +60,6 @@ namespace Waila::Fields
 	inline auto NeededResources  = WAILA_FIELD(UAuItemRecipeData, NeededResources);
 	inline auto RecipeOutputItem = WAILA_FIELD(UAuItemRecipeData, OutputItem);
 	inline auto RecipeBuildTime  = WAILA_FIELD(UAuItemRecipeData, BuildTime);
-	inline auto RecipeIcon       = WAILA_FIELD(UCrItemRecipeData, Icon);
 	inline auto SettingsSpeed    = WAILA_FIELD(FCrCraftingSettings, CraftingSpeed);
 	inline auto QueuedRecipe     = WAILA_FIELD(FAuCraftItem, RecipeData);
 	inline auto QueuedOutput     = WAILA_FIELD(FAuCraftItem, OutputItem);
@@ -230,10 +229,9 @@ namespace Waila::Fields
 			: nullptr;
 	}
 
-	// The brush a building, a recipe or an item shows as its icon, or null.
-	inline const SDK::FSlateBrush* IconOf(const SDK::UCrBuildingData* data)   { return BuildingIcon.In(static_cast<const void*>(data)); }
-	inline const SDK::FSlateBrush* IconOf(const SDK::UCrItemRecipeData* data) { return RecipeIcon.In(static_cast<const void*>(data)); }
-	inline const SDK::FSlateBrush* IconOf(const SDK::UAuItemDataBase* data)   { return ItemIcon.In(static_cast<const void*>(data)); }
+	// The brush a building or an item shows as its icon, or null.
+	inline const SDK::FSlateBrush* IconOf(const SDK::UCrBuildingData* data) { return BuildingIcon.In(static_cast<const void*>(data)); }
+	inline const SDK::FSlateBrush* IconOf(const SDK::UAuItemDataBase* data) { return ItemIcon.In(static_cast<const void*>(data)); }
 
 	// The localized name and description of a building. False without data.
 	inline bool ReadBuildingTexts(SDK::UCrBuildingData* data, std::string& name, std::string& description)
@@ -387,7 +385,7 @@ namespace Waila::Features
 
 	inline const KeyList CrafterKeys = Join(ItemKeys,
 		KeysOf(Keys::GetCraftingFragment, CraftComponent, CraftingSettings, SettingsSpeed, ItemsToCraft,
-			NeededResources, RecipeOutputItem, RecipeBuildTime, RecipeIcon, InItemStorage, SimpleItemCount,
+			NeededResources, RecipeOutputItem, RecipeBuildTime, InItemStorage, SimpleItemCount,
 			QueuedRecipe, QueuedOutput, OrderItem, OrderCount, FragMultiplier, FragMissingItems, FragOutputFull,
 			FragSelected, FragSpeed, CraftItemSize, RecipeOrderSize));
 

@@ -69,7 +69,7 @@ namespace Waila::Fields
             ItemName, UniqueItemName, ItemIcon, GridColumns, GridRows,
             StorageItems, SlotDisabled, SlotItem, SimpleItemCount, SimpleItemData,
             CraftComponent, CraftingSettings, SettingsSpeed, ItemsToCraft, NeededResources, RecipeOutputItem,
-            RecipeBuildTime, RecipeIcon, QueuedRecipe, QueuedOutput, OrderItem, OrderCount,
+            RecipeBuildTime, QueuedRecipe, QueuedOutput, OrderItem, OrderCount,
             FragMultiplier, FragMissingItems, FragOutputFull, FragSelected, FragSpeed,
             SocketsData, Spline, SocketRef, SocketTransform,
             PackageTransportReplicator, SendingTime, SenderReceiversContainer, AllSenderReceiversData,
