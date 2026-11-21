@@ -1,3 +1,4 @@
+- A server host can switch a kind of card off while the game runs, and WAILA stops showing it until the host turns it back on
 - Card icons are drawn sharper, and the item icons on drone rail cards are larger so they are easier to read
 - Card icons now come from the ModLoader's image library instead of WAILA's own icon cache. Cards keep their layout while an icon loads. This version needs ModLoader 1.24.0 or newer
 - A storage or rail holding Ammo and blueprint items now lists each as its own item instead of adding them together
