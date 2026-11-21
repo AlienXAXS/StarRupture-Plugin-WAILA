@@ -312,9 +312,28 @@ namespace Waila::UI
 
 	// Game thread, from Tick: the actor pointer is valid for this tick only, so
 	// the waypoint gets an ObjectRef and finds the actor again every tick.
-	void WailaUIManager::StartWaypoint(const Waila::UI::CardModel& card, SDK::AActor* actor)
+	void WailaUIManager::StartWaypoint(const Waila::UI::CardModel& card, SDK::AActor* actor, Target kind)
 	{
+		m_waypointKind = kind;
 		m_waypoint.SetActor(ObjectRef<SDK::AActor>(actor), card.title);
+	}
+
+	// The feature a card is behind. Go To Target has none of its own: it points
+	// at what a card shows, so it is on while that card's feature is.
+	bool WailaUIManager::TargetOn(Target kind)
+	{
+		switch (kind)
+		{
+		case Target::Crafter:       return Waila::Features::ShowCrafters();
+		case Target::Storage:       return Waila::Features::ShowItems();
+		case Target::Power:         return Waila::Features::ShowBuildings();
+		case Target::CoolerActive:  return Waila::Features::ShowBuildings();
+		case Target::CoolerPassive: return Waila::Features::ShowBuildings();
+		case Target::Sender:        return Waila::Features::ShowPackageTransport();
+		case Target::Receiver:      return Waila::Features::ShowItems();
+		case Target::Rail:          return Waila::Features::ShowRailSources() || Waila::Features::ShowDroneRails();
+		default:                    return false;
+		}
 	}
 
 	namespace
@@ -371,6 +390,9 @@ namespace Waila::UI
 
 		RailDetector::SampleRates(deltaSeconds);
 
+		// A target whose card's feature was switched off closes at once.
+		if (m_waypoint.Active() && !TargetOn(m_waypointKind))
+			m_waypoint.Clear();
 		m_waypoint.Tick(PluginSdkRuntime::GetWorld());
 
 
@@ -383,6 +405,7 @@ namespace Waila::UI
 		Waila::CargoSenderInfo   cargoSenderInfo;
 		Waila::CargoReceiverInfo cargoReceiverInfo;
 		Waila::RailInfo          railInfo;
+		Target                   aimed = Target::None;
 
 		// Perform raycast and extract info immediately (while actor pointer is valid)
 		// PerformRaycast always fills hit.rayStart/rayEnd even on a miss, so we can visualise both cases.
@@ -393,42 +416,50 @@ namespace Waila::UI
 			// that kind of building, so it does not fall through to another card.
 			if (Waila::CrafterDetector::IsCrafter(hit.actor))
 			{
-				if (Waila::Features::ShowCrafters())
+				aimed = Target::Crafter;
+				if (TargetOn(aimed))
 					Waila::CrafterDetector::GetCrafterInfo(hit.actor, info);
 			}
 			else if (Waila::StorageDetector::IsStorage(hit.actor))
 			{
-				if (Waila::Features::ShowItems())
+				aimed = Target::Storage;
+				if (TargetOn(aimed))
 					Waila::StorageDetector::GetStorageInfo(hit.actor, storageInfo);
 			}
 			else if (Waila::PowerDetector::IsGenerator(hit.actor))
 			{
-				if (Waila::Features::ShowBuildings())
+				aimed = Target::Power;
+				if (TargetOn(aimed))
 					Waila::PowerDetector::GetPowerInfo(hit.actor, powerInfo);
 			}
 			else if (Waila::CoolerActiveDetector::IsCoolerActive(hit.actor))
 			{
-				if (Waila::Features::ShowBuildings())
+				aimed = Target::CoolerActive;
+				if (TargetOn(aimed))
 					Waila::CoolerActiveDetector::GetCoolerActiveInfo(hit.actor, coolerActiveInfo);
 			}
 			else if (Waila::CoolerPassiveDetector::IsCoolerPassive(hit.actor))
 			{
-				if (Waila::Features::ShowBuildings())
+				aimed = Target::CoolerPassive;
+				if (TargetOn(aimed))
 					Waila::CoolerPassiveDetector::GetCoolerPassiveInfo(hit.actor, coolerPassiveInfo);
 			}
 			else if (Waila::CargoSenderDetector::IsSender(hit.actor))
 			{
-				if (Waila::Features::ShowPackageTransport())
+				aimed = Target::Sender;
+				if (TargetOn(aimed))
 					Waila::CargoSenderDetector::GetSenderInfo(hit.actor, cargoSenderInfo);
 			}
 			else if (Waila::CargoReceiverDetector::IsReceiver(hit.actor))
 			{
-				if (Waila::Features::ShowItems())
+				aimed = Target::Receiver;
+				if (TargetOn(aimed))
 					Waila::CargoReceiverDetector::GetReceiverInfo(hit.actor, cargoReceiverInfo);
 			}
 			else if (Waila::RailDetector::IsRail(hit.actor))
 			{
-				if (Waila::Features::ShowRailSources() || Waila::Features::ShowDroneRails())
+				aimed = Target::Rail;
+				if (TargetOn(aimed))
 					Waila::RailDetector::GetRailInfo(hit.actor, railInfo);
 			}
 		}
@@ -448,12 +479,13 @@ namespace Waila::UI
 		else if (railInfo.IsValid())          Waila::UI::Card::FromRail(railInfo, card);
 
 		// Go To Target: a press aimed at something WAILA shows a card for. Terrain
-		// and unsupported actors have no card, so a press on them does nothing.
+		// and unsupported actors have no card, and a card whose feature is off is
+		// not built, so a press on any of them does nothing.
 		const bool goRequested = m_goRequested.exchange(false);
 		if (!m_goEnabled.load())
 			m_waypoint.Clear();
 		else if (goRequested && card.valid && bHit && hit.actor)
-			StartWaypoint(card, hit.actor);
+			StartWaypoint(card, hit.actor, aimed);
 
 		// Size the window to exactly what the card will paint, at the current scale.
 		const bool hasCard = card.valid;

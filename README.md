@@ -16,6 +16,7 @@
   - **Drone Rails** — what the machines attached to a rail's network make and take, read from the game's drone logistics, so it works with nothing moving and along the whole line, out of render range too. See [Rail card](#rail-card) <sup>[✦](#msantoro12)</sup>
 - Configurable max detection distance, card scale/opacity, and optional building descriptions
 - **Go To Target** key (default End): aim at a building and press it to get a small window with an arrow and the distance that points you at it. It stays when you look away, and closes when you get within 10 m, press its X, or the building is gone. The key and an on/off switch are on the ModLoader config page (F2) <sup>[✦](#msantoro12)</sup>
+- A server host can switch a kind of card off while the game runs (buildings, items, crafters, drone rails, package transport, cargo send rates). That card stops showing, and so does a Go To Target window pointing at that kind of building; both come back when the host turns it on again <sup>[✦](#msantoro12)</sup>
 - Item and building icons come from the ModLoader's image library, which keeps one small copy of each image for every mod. A card keeps its layout while an icon is still loading. Icons are drawn sharper, and those on a drone rail card larger. Icons follow the overlay font size, and the card widens to fit them
 - Thread-safe: game tick and ImGui render thread are fully decoupled via mutex
 
