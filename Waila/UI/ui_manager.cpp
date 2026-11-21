@@ -39,6 +39,22 @@ namespace Waila::UI
 		}
 	}
 
+	void WailaUIManager::OnRenderWaypoint(IModLoaderImGui* imgui)
+	{
+		if (s_instance && imgui)
+		{
+			s_instance->m_waypoint.Render(imgui);
+		}
+	}
+
+	void WailaUIManager::OnGoKey(EModKey, EModKeyEvent)
+	{
+		if (s_instance)
+		{
+			s_instance->m_goRequested.store(true);
+		}
+	}
+
 	// ---------------------------------------------------------------------------
 	// Lifecycle
 	// ---------------------------------------------------------------------------
@@ -93,6 +109,8 @@ namespace Waila::UI
 		// Register engine tick for raycasting
 		if (m_self->hooks)
 		{
+			RegisterGoKey();
+
 			if (m_self->hooks->Engine)
 			{
 				m_self->hooks->Engine->RegisterOnTick(&WailaUIManager::OnTick);
@@ -103,6 +121,7 @@ namespace Waila::UI
 			{
 				Waila::UI::Icons::Init();
 				RegisterMainWidget();
+				RegisterWaypointWidget();
 
 				m_self->hooks->UI->RegisterOnConfigChanged(m_self, &OnConfigChanged);
 			}
@@ -125,8 +144,11 @@ namespace Waila::UI
 				m_self->hooks->Engine->UnregisterOnTick(&WailaUIManager::OnTick);
 			}
 
+			UnregisterGoKey();
+
 			if (m_self->hooks->UI)
 			{
+				UnregisterWaypointWidget();
 				UnregisterMainWidget();
 
 				// No stale card after a reload.
@@ -163,6 +185,7 @@ namespace Waila::UI
 		m_scale                 = WailaPluginConfig::Config::GetScale();
 		m_opacity               = WailaPluginConfig::Config::GetOpacity();
 		m_showDescriptions      = WailaPluginConfig::Config::ShouldRenderDescriptions();
+		m_goEnabled.store(WailaPluginConfig::Config::IsGoToTargetEnabled());
 
 		ClampSettings();
 		Card::SetShowDescriptions(m_showDescriptions);
@@ -230,6 +253,70 @@ namespace Waila::UI
 		m_widgetVisible = false;
 	}
 
+	void WailaUIManager::RegisterWaypointWidget()
+	{
+		if (!m_self || !m_self->hooks || !m_self->hooks->UI || m_waypointWidget)
+			return;
+
+		// The default window with its title bar, so the player can drag it. Its
+		// own widget rather than part of the card: the card hides when nothing is
+		// aimed at, and the waypoint has to stay while the player looks away.
+		m_waypointHints = { 240.f, 0.f, -1.f, -1.f, 0.f, 0.f, 1 /*FirstUseEver*/, 1 /*FirstUseEver*/,
+			PluginWindowFlags_NoScrollbar };
+		m_waypointDesc.name        = "WAILA Go To###WailaGoTo";
+		m_waypointDesc.renderFn    = &WailaUIManager::OnRenderWaypoint;
+		m_waypointDesc.windowHints = &m_waypointHints;
+
+		m_waypointWidget = m_self->hooks->UI->RegisterWidget(&m_waypointDesc);
+		if (!m_waypointWidget)
+		{
+			LOG_ERROR("WailaUIManager: failed to register the Go To Target widget");
+			return;
+		}
+
+		m_self->hooks->UI->SetWidgetVisible(m_waypointWidget, false);
+		m_waypointVisible = false;
+	}
+
+	void WailaUIManager::UnregisterWaypointWidget()
+	{
+		m_waypoint.Clear();
+
+		if (!m_self || !m_self->hooks || !m_self->hooks->UI || !m_waypointWidget)
+			return;
+
+		m_self->hooks->UI->UnregisterWidget(m_waypointWidget);
+		m_waypointWidget  = nullptr;
+		m_waypointVisible = false;
+	}
+
+	// The loader follows a rebind on the config page and keeps the name given
+	// here as the one to unregister with, so the name is stored as registered.
+	void WailaUIManager::RegisterGoKey()
+	{
+		if (!m_self || !m_self->hooks || !m_self->hooks->Input)
+			return;
+
+		WailaPluginConfig::Config::GetGoToTargetKey(m_goKeyName, sizeof(m_goKeyName));
+		if (m_goKeyName[0])
+			m_self->hooks->Input->RegisterKeybindByName(m_goKeyName, EModKeyEvent::Pressed, &WailaUIManager::OnGoKey);
+	}
+
+	void WailaUIManager::UnregisterGoKey()
+	{
+		if (m_self && m_self->hooks && m_self->hooks->Input && m_goKeyName[0])
+			m_self->hooks->Input->UnregisterKeybindByName(m_goKeyName, EModKeyEvent::Pressed, &WailaUIManager::OnGoKey);
+		m_goKeyName[0] = '\0';
+		m_goRequested.store(false);
+	}
+
+	// Game thread, from Tick: the actor pointer is valid for this tick only, so
+	// the waypoint gets an ObjectRef and finds the actor again every tick.
+	void WailaUIManager::StartWaypoint(const Waila::UI::CardModel& card, SDK::AActor* actor)
+	{
+		m_waypoint.SetActor(ObjectRef<SDK::AActor>(actor), card.title);
+	}
+
 	namespace
 	{
 		bool ParseConfigBool(const char* value)
@@ -252,6 +339,11 @@ namespace Waila::UI
 		if      (strcmp(key, "Max Distance") == 0) s_instance->m_maxDistance = strtof(newValue, nullptr);
 		else if (strcmp(key, "Scale")        == 0) s_instance->m_scale       = strtof(newValue, nullptr);
 		else if (strcmp(key, "Opacity")      == 0) s_instance->m_opacity     = strtof(newValue, nullptr);
+		else if (strcmp(key, "Go To Target") == 0)
+		{
+			s_instance->m_goEnabled.store(ParseConfigBool(newValue));
+			return;
+		}
 		else if (strcmp(key, "Render Building Descriptions") == 0)
 		{
 			s_instance->m_showDescriptions = ParseConfigBool(newValue);
@@ -278,6 +370,8 @@ namespace Waila::UI
 		}
 
 		RailDetector::SampleRates(deltaSeconds);
+
+		m_waypoint.Tick(PluginSdkRuntime::GetWorld());
 
 
 		Waila::Core::RaycastHit hit;
@@ -353,6 +447,14 @@ namespace Waila::UI
 		else if (cargoReceiverInfo.IsValid()) Waila::UI::Card::FromCargoReceiver(cargoReceiverInfo, card);
 		else if (railInfo.IsValid())          Waila::UI::Card::FromRail(railInfo, card);
 
+		// Go To Target: a press aimed at something WAILA shows a card for. Terrain
+		// and unsupported actors have no card, so a press on them does nothing.
+		const bool goRequested = m_goRequested.exchange(false);
+		if (!m_goEnabled.load())
+			m_waypoint.Clear();
+		else if (goRequested && card.valid && bHit && hit.actor)
+			StartWaypoint(card, hit.actor);
+
 		// Size the window to exactly what the card will paint, at the current scale.
 		const bool hasCard = card.valid;
 		if (hasCard)
@@ -378,6 +480,13 @@ namespace Waila::UI
 			{
 				m_self->hooks->UI->SetWidgetVisible(m_widgetHandle, hasCard);
 				m_widgetVisible = hasCard;
+			}
+
+			const bool waypointActive = m_waypoint.Active();
+			if (m_waypointWidget && waypointActive != m_waypointVisible)
+			{
+				m_self->hooks->UI->SetWidgetVisible(m_waypointWidget, waypointActive);
+				m_waypointVisible = waypointActive;
 			}
 		}
 	}

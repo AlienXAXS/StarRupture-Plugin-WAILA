@@ -1,6 +1,7 @@
 #pragma once
 
 #include "plugin_interface.h"
+#include <cstdio>
 #include <string>
 
 namespace WailaPluginConfig
@@ -46,6 +47,20 @@ namespace WailaPluginConfig
 			"Opacity of the WAILA card background",
 			0.30f,
 			1.0f
+		},
+		{
+			"WAILA",
+			"Go To Target",
+			ConfigValueType::Boolean,
+			"true",
+			"Let the Go To Target key point you at the building or object you are looking at"
+		},
+		{
+			"WAILA",
+			"Go To Target Key",
+			ConfigValueType::Keybind,
+			"End",
+			"Key that puts a waypoint on the building or object you are looking at. It stays until you reach it, close it or the target is gone"
 		}
 	};
 
@@ -93,6 +108,18 @@ namespace WailaPluginConfig
 		static float GetOpacity()
 		{
 			return s_self ? s_self->config->ReadFloat(s_self, "WAILA", "Opacity", 0.92f) : 0.92f;
+		}
+
+		static bool IsGoToTargetEnabled()
+		{
+			return s_self ? s_self->config->ReadBool(s_self, "WAILA", "Go To Target", true) : true;
+		}
+
+		// Copies the key name (e.g. "End", "Ctrl+End") into out; empty when unbound.
+		static void GetGoToTargetKey(char* out, int maxLen)
+		{
+			if (!s_self || !s_self->config->ReadString(s_self, "WAILA", "Go To Target Key", out, maxLen, "End"))
+				snprintf(out, maxLen, "%s", "End");
 		}
 
 	private:

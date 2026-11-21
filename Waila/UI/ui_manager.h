@@ -11,6 +11,7 @@
 #include "cargo_receiver_detector.h"
 #include "rail_detector.h"
 #include "UI/card_model.h"
+#include "plugin_waypoint.h"
 #include "Engine_structs.hpp"
 #include <atomic>
 #include <mutex>
@@ -46,6 +47,14 @@ namespace Waila::UI
 
 		void RegisterMainWidget();
 		void UnregisterMainWidget();
+
+		// ── Go To Target waypoint ────────────────────────────────────────────
+		// Its own widget, so it keeps drawing when no card is showing.
+		void RegisterWaypointWidget();
+		void UnregisterWaypointWidget();
+		void RegisterGoKey();
+		void UnregisterGoKey();
+		void StartWaypoint(const Waila::UI::CardModel& card, SDK::AActor* actor);
 		void UpdateWindowHints(float width, float height);
 
 		// Full read from the ini, for startup only.
@@ -55,6 +64,8 @@ namespace Waila::UI
 		// ── Static C-linkage callbacks for plugin API ────────────────────────
 		static void OnTick(float deltaSeconds);
 		static void OnRenderWidget(IModLoaderImGui* imgui);
+		static void OnRenderWaypoint(IModLoaderImGui* imgui);
+		static void OnGoKey(EModKey key, EModKeyEvent event);
 
 		static void OnConfigChanged(const char* section, const char* key, const char* newValue);
 
@@ -74,6 +85,17 @@ namespace Waila::UI
 		PluginWindowHints m_widgetHints      = {};
 
 		Waila::Core::WailaRaycastSystem m_raycaster;
+
+		// Go To Target. The key callback only raises m_goRequested; the next
+		// Tick (game thread) reads the aimed actor and starts the waypoint.
+		PluginWaypoint::Waypoint m_waypoint;
+		WidgetHandle             m_waypointWidget  = nullptr;
+		bool                     m_waypointVisible = false;
+		PluginWidgetDesc         m_waypointDesc    = {};
+		PluginWindowHints        m_waypointHints   = {};
+		std::atomic<bool>        m_goEnabled{ true };
+		std::atomic<bool>        m_goRequested{ false };
+		char                     m_goKeyName[64]   = {};   // as registered; the loader unregisters by it
 
 		// Built by Tick (game thread), consumed by RenderWidget (render thread).
 		// The model holds no engine pointers, so the render side never touches a
