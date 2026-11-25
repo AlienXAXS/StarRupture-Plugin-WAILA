@@ -15,7 +15,6 @@
   - **Cargo Receivers** — incoming cargo state
   - **Drone Rails** — what the machines attached to a rail's network make and take, read from the game's drone logistics, so it works with nothing moving and along the whole line, out of render range too. See [Rail card](#rail-card) <sup>[✦](#msantoro12)</sup>
 - Configurable max detection distance, card scale/opacity, and optional building descriptions
-- A server host can switch a kind of card off while the game runs (buildings, items, crafters, drone rails, package transport, cargo send rates). That card stops showing and comes back when the host turns it on again <sup>[✦](#msantoro12)</sup>
 - Item and building icons come from the ModLoader's image library, which keeps one small copy of each image for every mod. A card keeps its layout while an icon is still loading. Icons are drawn sharper, and those on a drone rail card larger. Icons follow the overlay font size, and the card widens to fit them
 - Thread-safe: game tick and ImGui render thread are fully decoupled via mutex
 

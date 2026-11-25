@@ -1,2 +1,1 @@
-- A server host can switch a kind of card off while the game runs, and WAILA stops showing it until the host turns it back on
 - A machine card shows the item a recipe makes with that item's own icon, so Sulfuric Acid is no longer drawn with the Battery's icon
