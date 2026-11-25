@@ -813,6 +813,17 @@ namespace Waila::RailMass
 			&& g_getSubsystem && g_getFragment && g_isValid && g_isBuilt && g_getHandle && g_getShared;
 	}
 
+	uint32_t Switches()
+	{
+		return (g_feature.On()           ? 1u << 0 : 0u)
+		     | (g_capacityFeature.On()   ? 1u << 1 : 0u)
+		     | (g_buildingFeature.On()   ? 1u << 2 : 0u)
+		     | (g_trackFeature.On()      ? 1u << 3 : 0u)
+		     | (g_stockFeature.On()      ? 1u << 4 : 0u)
+		     | (g_requestsFeature.On()   ? 1u << 5 : 0u)
+		     | (Features::ShowPackageRates() ? 1u << 6 : 0u);
+	}
+
 	bool CapacityAvailable()
 	{
 		return Available() && !g_capacityFaulted && g_capacityResolved && g_capacityFeature.On();

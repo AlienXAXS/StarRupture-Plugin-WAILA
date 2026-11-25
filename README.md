@@ -15,6 +15,7 @@
   - **Cargo Receivers** — incoming cargo state
   - **Drone Rails** — what the machines attached to a rail's network make and take, read from the game's drone logistics, so it works with nothing moving and along the whole line, out of render range too. See [Rail card](#rail-card) <sup>[✦](#msantoro12)</sup>
 - Configurable max detection distance, card scale/opacity, and optional building descriptions
+- A server host can switch a kind of card off while the game runs (buildings, items, crafters, drone rails, rail stock, package transport, cargo send rates). That card stops showing at once, and what it had measured is thrown away; both come back when the host turns it on again <sup>[✦](#msantoro12)</sup>
 - Thread-safe: game tick and ImGui render thread are fully decoupled via mutex
 
 ## Rail card <sup>[✦](#msantoro12)</sup>

@@ -56,7 +56,7 @@ namespace Waila
 		{
 			const AActor*                             rail = nullptr;
 			std::chrono::steady_clock::time_point     stamp{};
-			bool                                      fromMass  = false;
+			uint32_t                                  switches  = 0;       // the features it was built under
 			bool                                      found     = false;   // the Mass walk could start from the rail
 			bool                                      linked    = false;   // it found a building or storage linked to the rail
 			bool                                      truncated = false;
@@ -784,12 +784,18 @@ namespace Waila
 		// rail's numbers for at most one refresh.
 		const auto now = std::chrono::steady_clock::now();
 		const bool fromMass = Features::ShowRailSources() && Features::ShowCrafters();
-		if (g_cache.rail != actor || g_cache.fromMass != fromMass || now - g_cache.stamp >= kRefresh)
+
+		// A host switching a feature off must not wait out the refresh: a card
+		// built under other switches is thrown away.
+		const uint32_t switches = RailMass::Switches()
+			| (Features::ShowCrafters()   ? 1u << 16 : 0u)
+			| (Features::ShowDroneRails() ? 1u << 17 : 0u);
+		if (g_cache.rail != actor || g_cache.switches != switches || now - g_cache.stamp >= kRefresh)
 		{
 			g_cache = Cache{};
 			g_cache.rail     = actor;
 			g_cache.stamp    = now;
-			g_cache.fromMass = fromMass;
+			g_cache.switches = switches;
 
 			if (fromMass)
 			{
@@ -891,6 +897,14 @@ namespace Waila
 
 	void RailDetector::SampleRates(float deltaSeconds)
 	{
+		// Switched off, the rates go with it: on again they are measured afresh.
+		if (!Features::ShowPackageRates())
+		{
+			g_rates.Clear();
+			g_sampleClock = 0.0f;
+			return;
+		}
+
 		g_sampleClock += deltaSeconds;
 		if (g_sampleClock < kSampleSeconds)
 			return;

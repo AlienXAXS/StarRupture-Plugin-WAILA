@@ -48,6 +48,10 @@ namespace Waila::RailMass
 	bool Available();
 	bool CapacityAvailable();
 
+	// One bit per feature the rail reader's parts are behind, the rates
+	// included, so a caller holding what they built can tell a switch moved.
+	uint32_t Switches();
+
 	// The rail's, or a building's, own Mass entity. 0 when it has none yet.
 	Entity EntityOf(SDK::AActor* actor);
 
