@@ -789,7 +789,8 @@ namespace Waila
 		// built under other switches is thrown away.
 		const uint32_t switches = RailMass::Switches()
 			| (Features::ShowCrafters()   ? 1u << 16 : 0u)
-			| (Features::ShowDroneRails() ? 1u << 17 : 0u);
+			| (Features::ShowDroneRails() ? 1u << 17 : 0u)
+			| (fromMass                    ? 1u << 18 : 0u);
 		if (g_cache.rail != actor || g_cache.switches != switches || now - g_cache.stamp >= kRefresh)
 		{
 			g_cache = Cache{};
