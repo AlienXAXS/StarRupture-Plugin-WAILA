@@ -432,6 +432,13 @@ namespace Waila::Features
 	// A drone rail's sources and destinations from the game's Mass data.
 	inline bool ShowRailSources()      { return RailMass::Available(); }
 
+	// Any card at all. With none on, nothing needs aiming at.
+	inline bool ShowAnyCard()
+	{
+		return ShowBuildings() || ShowItems() || ShowCrafters() || ShowDroneRails()
+			|| ShowPackageTransport() || ShowRailSources();
+	}
+
 	// The rail's max, from the lane's own speed and spacing.
 	inline bool ShowRailCapacity()     { return RailMass::CapacityAvailable(); }
 }

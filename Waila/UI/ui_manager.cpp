@@ -277,8 +277,29 @@ namespace Waila::UI
 			return;
 		}
 
-		RailDetector::SampleRates(deltaSeconds);
+		// With every card off there is nothing to aim at. Drop what the last
+		// card left, once, so nothing stale shows when one comes back.
+		if (!Waila::Features::ShowAnyCard())
+		{
+			if (!m_cardsIdle)
+			{
+				m_cardsIdle = true;
+				{
+					std::lock_guard<std::mutex> lock(m_infoMutex);
+					m_pendingCard.Clear();
+				}
+				Waila::RailDetector::Reset();
+				if (m_widgetVisible && m_self->hooks && m_self->hooks->UI && m_widgetHandle)
+				{
+					m_self->hooks->UI->SetWidgetVisible(m_widgetHandle, false);
+					m_widgetVisible = false;
+				}
+			}
+			return;
+		}
+		m_cardsIdle = false;
 
+		RailDetector::SampleRates(deltaSeconds);
 
 		Waila::Core::RaycastHit hit;
 		Waila::CrafterInfo  info;

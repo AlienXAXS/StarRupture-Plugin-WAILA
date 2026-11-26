@@ -70,6 +70,7 @@ namespace Waila::UI
 
 		WidgetHandle      m_widgetHandle     = nullptr;
 		bool              m_widgetVisible    = false;
+		bool              m_cardsIdle        = false;   // Tick: every card is off, nothing is being aimed at
 		PluginWidgetDesc  m_widgetDesc       = {};
 		PluginWindowHints m_widgetHints      = {};
 
