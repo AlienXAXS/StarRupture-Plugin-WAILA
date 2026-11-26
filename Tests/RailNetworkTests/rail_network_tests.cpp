@@ -431,6 +431,26 @@ namespace
 		Check(flows.front().item == "Plate", "the biggest flow comes first");
 	}
 
+	// A machine takes an item only through a request that brings it in. One
+	// that ships the same item out is the machine sending it, so it adds
+	// nothing to what the consumers take.
+	void TestTakersFollowTheirRequests()
+	{
+		const std::vector<OpenRequest> ships{ { "A", true } };
+		const std::vector<OpenRequest> brings{ { "A", false } };
+		const std::vector<OpenRequest> both{ { "B", false }, { "A", true }, { "A", false } };
+		Check(!TakesItem({}, "A"), "no request: it takes nothing");
+		Check(!TakesItem(ships, "A"), "a request shipping A out does not take A");
+		Check(TakesItem(brings, "A") && !TakesItem(brings, "B"), "a request bringing A in takes A only");
+		Check(TakesItem(both, "A") && TakesItem(both, "B"), "shipping and bringing the same item: it takes it");
+
+		std::vector<FlowPart> parts{ Maker(1, "A", 600), Taker(2, "A", 90), Taker(3, "A", 90) };
+		parts[1].now = TakesItem(ships, "A") ? parts[1].full : 0.0f;
+		parts[2].now = TakesItem(brings, "A") ? parts[2].full : 0.0f;
+		const std::vector<ItemFlow> flows = SumFlows(parts, 480.0f);
+		Check(flows.size() == 1 && Near(flows[0].now, 90), "only the machine bringing A in counts toward what moves");
+	}
+
 	// The rail caps all three; an unread rate leaves what it feeds unknown. max
 	// and min are about the makers only, now is what moves.
 	void TestFlowsLimits()
@@ -1015,6 +1035,7 @@ int main()
 	TestPlatform(dir);
 	TestFlowsOneRowPerItem();
 	TestFlowsLimits();
+	TestTakersFollowTheirRequests();
 	TestFlowsStalledSource();
 	TestFlowsCapAndMin();
 	TestFlowsUnrated();

@@ -384,6 +384,7 @@ namespace Waila
 			RailMass::Entity                  machine = 0;
 			std::vector<Input>                inputs;
 			std::vector<RailMass::RequestView> requests;
+			std::vector<RailNetwork::OpenRequest> asks;   // the requests that bring an item in
 			bool                              requestsRead = false;
 		};
 
@@ -510,7 +511,10 @@ namespace Waila
 				if (RailMass::ReadCrafter(machine, crafter) && crafter.isCrafter && crafter.recipe)
 					taker.inputs = InputsOf(crafter.recipe, crafter.speed);
 				taker.requestsRead = RailMass::ReadRequests(machine, taker.requests);
-				if (!taker.inputs.empty() || !taker.requests.empty())
+				for (const RailMass::RequestView& request : taker.requests)
+					taker.asks.push_back({ Fields::UniqueNameOf(request.wanted), request.store });
+				if (!taker.inputs.empty() || std::any_of(taker.asks.begin(), taker.asks.end(),
+						[](const RailNetwork::OpenRequest& r) { return !r.store; }))
 					takers.push_back(std::move(taker));
 			}
 
@@ -616,11 +620,7 @@ namespace Waila
 			for (const Taker& taker : takers)
 			{
 				const std::string& name = nameOf(taker.machine);
-				auto requesting = [&](const std::string& item)
-				{
-					return std::any_of(taker.requests.begin(), taker.requests.end(),
-						[&](const RailMass::RequestView& r) { return Fields::UniqueNameOf(r.wanted) == item; });
-				};
+				auto requesting = [&](const std::string& item) { return RailNetwork::TakesItem(taker.asks, item); };
 				// An item only a request names has no recipe rate: a Cargo Sender
 				// takes it at its connections' rate, any other taker is counted and
 				// named but adds to no total.
@@ -647,11 +647,10 @@ namespace Waila
 					if (carried.count(in.item) && added.insert(in.item).second)
 						add(in.item, in.perMin);
 				}
-				for (const RailMass::RequestView& request : taker.requests)
+				for (const RailNetwork::OpenRequest& ask : taker.asks)
 				{
-					const std::string unique = Fields::UniqueNameOf(request.wanted);
-					if (carried.count(unique) && added.insert(unique).second)
-						add(unique, -1.0f);
+					if (!ask.store && carried.count(ask.item) && added.insert(ask.item).second)
+						add(ask.item, -1.0f);
 				}
 			}
 

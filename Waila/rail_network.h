@@ -774,6 +774,23 @@ namespace Waila::RailNetwork
 		bool        starved = false;    // a source: missing an input of its own and not output full
 	};
 
+	// A request a machine has open: the item it names, and whether it ships
+	// that item out (Store) or brings it in (Acquire).
+	struct OpenRequest
+	{
+		std::string item;
+		bool        store = false;
+	};
+
+	// Whether a machine takes the item off the rail right now: it has a request
+	// open that brings the item in. A request that ships the item out is the
+	// machine sending it, and takes nothing.
+	inline bool TakesItem(const std::vector<OpenRequest>& requests, const std::string& item)
+	{
+		return std::any_of(requests.begin(), requests.end(),
+			[&](const OpenRequest& r) { return !r.store && r.item == item; });
+	}
+
 	// The totals of one item, items a minute; negative when unknown.
 	struct ItemFlow
 	{
