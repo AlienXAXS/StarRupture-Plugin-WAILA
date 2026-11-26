@@ -782,13 +782,16 @@ namespace Waila::RailNetwork
 		bool        store = false;
 	};
 
+	// A request that ships the item out is the machine sending it, and takes
+	// nothing off the rail; only one that brings it in is a taker.
+	inline bool BringsIn(const OpenRequest& request) { return !request.store; }
+
 	// Whether a machine takes the item off the rail right now: it has a request
-	// open that brings the item in. A request that ships the item out is the
-	// machine sending it, and takes nothing.
+	// open that brings the item in.
 	inline bool TakesItem(const std::vector<OpenRequest>& requests, const std::string& item)
 	{
 		return std::any_of(requests.begin(), requests.end(),
-			[&](const OpenRequest& r) { return !r.store && r.item == item; });
+			[&](const OpenRequest& r) { return BringsIn(r) && r.item == item; });
 	}
 
 	// The totals of one item, items a minute; negative when unknown.

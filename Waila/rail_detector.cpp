@@ -514,7 +514,7 @@ namespace Waila
 				for (const RailMass::RequestView& request : taker.requests)
 					taker.asks.push_back({ Fields::UniqueNameOf(request.wanted), request.store });
 				if (!taker.inputs.empty() || std::any_of(taker.asks.begin(), taker.asks.end(),
-						[](const RailNetwork::OpenRequest& r) { return !r.store; }))
+						[](const RailNetwork::OpenRequest& r) { return RailNetwork::BringsIn(r); }))
 					takers.push_back(std::move(taker));
 			}
 
@@ -649,7 +649,7 @@ namespace Waila
 				}
 				for (const RailNetwork::OpenRequest& ask : taker.asks)
 				{
-					if (!ask.store && carried.count(ask.item) && added.insert(ask.item).second)
+					if (RailNetwork::BringsIn(ask) && carried.count(ask.item) && added.insert(ask.item).second)
 						add(ask.item, -1.0f);
 				}
 			}
