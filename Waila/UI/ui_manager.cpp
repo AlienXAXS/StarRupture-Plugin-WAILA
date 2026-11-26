@@ -307,9 +307,13 @@ namespace Waila::UI
 		if (!m_goPlaceKey)
 			return;
 
+		// Keep the key until the call got through: a place left open while Go to Item
+		// is off is still open when it comes back, and must stay closable.
 		const GoToItemApi* api = GoToItem::GetIfOn();
-		if (api && GOTOITEM_HAS(api, UntrackPlace))
-			api->UntrackPlace(m_goPlaceKey);
+		if (!api || !GOTOITEM_HAS(api, UntrackPlace))
+			return;
+		if (api->UntrackPlace(m_goPlaceKey) == GOTO_OFF)
+			return;
 		m_goPlaceKey  = 0;
 		m_goPlaceKind = Target::None;
 	}
