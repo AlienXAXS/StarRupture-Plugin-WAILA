@@ -1,6 +1,7 @@
 #include "ui_manager.h"
 #include "plugin_helpers.h"
 #include "plugin_config.h"
+#include "plugin_go_to_item.h"
 #include "waila_functions.h"
 #include "waila_fields.h"
 #include "UI/icon_cache.h"
@@ -36,6 +37,14 @@ namespace Waila::UI
 		if (s_instance && imgui)
 		{
 			s_instance->RenderWidget(imgui);
+		}
+	}
+
+	void WailaUIManager::OnGoKey(EModKey, EModKeyEvent)
+	{
+		if (s_instance)
+		{
+			s_instance->m_goRequested.store(true);
 		}
 	}
 
@@ -93,6 +102,8 @@ namespace Waila::UI
 		// Register engine tick for raycasting
 		if (m_self->hooks)
 		{
+			RegisterGoKey();
+
 			if (m_self->hooks->Engine)
 			{
 				m_self->hooks->Engine->RegisterOnTick(&WailaUIManager::OnTick);
@@ -124,6 +135,13 @@ namespace Waila::UI
 			{
 				m_self->hooks->Engine->UnregisterOnTick(&WailaUIManager::OnTick);
 			}
+
+			UnregisterGoKey();
+
+			// Go to Item is game thread only. A RELOAD shuts down on it; process exit
+			// does not, and then the place goes with Go to Item's own shutdown.
+			if (m_self->hooks->Engine && m_self->hooks->Engine->IsGameThread && m_self->hooks->Engine->IsGameThread())
+				CloseGoPlace();
 
 			if (m_self->hooks->UI)
 			{
@@ -163,6 +181,7 @@ namespace Waila::UI
 		m_scale                 = WailaPluginConfig::Config::GetScale();
 		m_opacity               = WailaPluginConfig::Config::GetOpacity();
 		m_showDescriptions      = WailaPluginConfig::Config::ShouldRenderDescriptions();
+		m_goEnabled.store(WailaPluginConfig::Config::IsGoToTargetEnabled());
 
 		ClampSettings();
 		Card::SetShowDescriptions(m_showDescriptions);
@@ -230,6 +249,89 @@ namespace Waila::UI
 		m_widgetVisible = false;
 	}
 
+	// The loader follows a rebind on the config page and keeps the name given
+	// here as the one to unregister with, so the name is stored as registered.
+	void WailaUIManager::RegisterGoKey()
+	{
+		if (!m_self || !m_self->hooks || !m_self->hooks->Input)
+			return;
+
+		WailaPluginConfig::Config::GetGoToTargetKey(m_goKeyName, sizeof(m_goKeyName));
+		if (m_goKeyName[0])
+			m_self->hooks->Input->RegisterKeybindByName(m_goKeyName, EModKeyEvent::Pressed, &WailaUIManager::OnGoKey);
+	}
+
+	void WailaUIManager::UnregisterGoKey()
+	{
+		if (m_self && m_self->hooks && m_self->hooks->Input && m_goKeyName[0])
+			m_self->hooks->Input->UnregisterKeybindByName(m_goKeyName, EModKeyEvent::Pressed, &WailaUIManager::OnGoKey);
+		m_goKeyName[0] = 0;
+		m_goRequested.store(false);
+	}
+
+	// Game thread, from Tick. Go to Item follows the actor itself through its own
+	// weak reference, so nothing here outlives the tick. It is fetched on every use
+	// because a RELOAD can replace it; without it, without the place calls (an
+	// older Go to Item) or while a host has it off, the press does nothing. A
+	// GOTO_UNKNOWN_TARGET answer is treated the same: nothing is tracked.
+	void WailaUIManager::StartGoPlace(const Waila::UI::CardModel& card, SDK::AActor* actor, Target kind)
+	{
+		const GoToItemApi* api = GoToItem::GetIfOn();
+		if (!api || !GOTOITEM_HAS(api, TrackPlace) || !GOTOITEM_HAS(api, UntrackPlace))
+			return;
+
+		CloseGoPlace();   // one place at a time
+
+		const SDK::FVector at = actor->K2_GetActorLocation();
+		GoToPlace place = {};
+		place.size = sizeof(GoToPlace);
+		snprintf(place.name, sizeof(place.name), "%s", card.title.c_str());
+		place.x           = at.X;
+		place.y           = at.Y;
+		place.z           = at.Z;
+		place.actorIndex  = actor->Index;   // Go to Item re-checks the slot and class every tick
+		place.actorSerial = 0;              // the engine hands most actors no serial
+
+		uint64_t key = 0;
+		if (api->TrackPlace(&place, &key) == GOTO_OK)
+		{
+			m_goPlaceKey  = key;
+			m_goPlaceKind = kind;
+		}
+	}
+
+	// The place closes by itself on arrival and when its actor is gone, so
+	// GOTO_UNKNOWN_TARGET here only means it already did.
+	void WailaUIManager::CloseGoPlace()
+	{
+		if (!m_goPlaceKey)
+			return;
+
+		const GoToItemApi* api = GoToItem::GetIfOn();
+		if (api && GOTOITEM_HAS(api, UntrackPlace))
+			api->UntrackPlace(m_goPlaceKey);
+		m_goPlaceKey  = 0;
+		m_goPlaceKind = Target::None;
+	}
+
+	// The feature a card is behind. Go To Target has none of its own: it points
+	// at what a card shows, so it is on while that card's feature is.
+	bool WailaUIManager::TargetOn(Target kind)
+	{
+		switch (kind)
+		{
+		case Target::Crafter:       return Waila::Features::ShowCrafters();
+		case Target::Storage:       return Waila::Features::ShowItems();
+		case Target::Power:         return Waila::Features::ShowBuildings();
+		case Target::CoolerActive:  return Waila::Features::ShowBuildings();
+		case Target::CoolerPassive: return Waila::Features::ShowBuildings();
+		case Target::Sender:        return Waila::Features::ShowPackageTransport();
+		case Target::Receiver:      return Waila::Features::ShowItems();
+		case Target::Rail:          return Waila::Features::ShowRailSources() || Waila::Features::ShowDroneRails();
+		default:                    return false;
+		}
+	}
+
 	namespace
 	{
 		bool ParseConfigBool(const char* value)
@@ -252,6 +354,11 @@ namespace Waila::UI
 		if      (strcmp(key, "Max Distance") == 0) s_instance->m_maxDistance = strtof(newValue, nullptr);
 		else if (strcmp(key, "Scale")        == 0) s_instance->m_scale       = strtof(newValue, nullptr);
 		else if (strcmp(key, "Opacity")      == 0) s_instance->m_opacity     = strtof(newValue, nullptr);
+		else if (strcmp(key, "Go To Target") == 0)
+		{
+			s_instance->m_goEnabled.store(ParseConfigBool(newValue));
+			return;
+		}
 		else if (strcmp(key, "Render Building Descriptions") == 0)
 		{
 			s_instance->m_showDescriptions = ParseConfigBool(newValue);
@@ -276,6 +383,13 @@ namespace Waila::UI
 		{
 			return;
 		}
+
+		// Go To Target. A press is consumed every tick, so one made while it cannot
+		// act does not wait for later. The place closes when the switch is turned
+		// off or when its card's feature goes off.
+		const bool goRequested = m_goRequested.exchange(false);
+		if (m_goPlaceKey && (!m_goEnabled.load() || !TargetOn(m_goPlaceKind)))
+			CloseGoPlace();
 
 		// With every card off there is nothing to aim at. Drop what the last
 		// card left, once, so nothing stale shows when one comes back.
@@ -314,47 +428,56 @@ namespace Waila::UI
 		// Perform raycast and extract info immediately (while actor pointer is valid)
 		// PerformRaycast always fills hit.rayStart/rayEnd even on a miss, so we can visualise both cases.
 		bool bHit = m_raycaster.PerformRaycast(m_maxDistance, hit);
+		Target aimed = Target::None;
 		if (bHit && hit.actor)
 		{
 			// A card whose parts are not all on shows nothing; the hit is still
 			// that kind of building, so it does not fall through to another card.
 			if (Waila::CrafterDetector::IsCrafter(hit.actor))
 			{
+				aimed = Target::Crafter;
 				if (Waila::Features::ShowCrafters())
 					Waila::CrafterDetector::GetCrafterInfo(hit.actor, info);
 			}
 			else if (Waila::StorageDetector::IsStorage(hit.actor))
 			{
+				aimed = Target::Storage;
 				if (Waila::Features::ShowItems())
 					Waila::StorageDetector::GetStorageInfo(hit.actor, storageInfo);
 			}
 			else if (Waila::PowerDetector::IsGenerator(hit.actor))
 			{
+				aimed = Target::Power;
 				if (Waila::Features::ShowBuildings())
 					Waila::PowerDetector::GetPowerInfo(hit.actor, powerInfo);
 			}
 			else if (Waila::CoolerActiveDetector::IsCoolerActive(hit.actor))
 			{
+				aimed = Target::CoolerActive;
 				if (Waila::Features::ShowBuildings())
 					Waila::CoolerActiveDetector::GetCoolerActiveInfo(hit.actor, coolerActiveInfo);
 			}
 			else if (Waila::CoolerPassiveDetector::IsCoolerPassive(hit.actor))
 			{
+				aimed = Target::CoolerPassive;
 				if (Waila::Features::ShowBuildings())
 					Waila::CoolerPassiveDetector::GetCoolerPassiveInfo(hit.actor, coolerPassiveInfo);
 			}
 			else if (Waila::CargoSenderDetector::IsSender(hit.actor))
 			{
+				aimed = Target::Sender;
 				if (Waila::Features::ShowPackageTransport())
 					Waila::CargoSenderDetector::GetSenderInfo(hit.actor, cargoSenderInfo);
 			}
 			else if (Waila::CargoReceiverDetector::IsReceiver(hit.actor))
 			{
+				aimed = Target::Receiver;
 				if (Waila::Features::ShowItems())
 					Waila::CargoReceiverDetector::GetReceiverInfo(hit.actor, cargoReceiverInfo);
 			}
 			else if (Waila::RailDetector::IsRail(hit.actor))
 			{
+				aimed = Target::Rail;
 				if (Waila::Features::ShowRailSources() || Waila::Features::ShowDroneRails())
 					Waila::RailDetector::GetRailInfo(hit.actor, railInfo);
 			}
@@ -373,6 +496,9 @@ namespace Waila::UI
 		else if (cargoSenderInfo.IsValid())   Waila::UI::Card::FromCargoSender(cargoSenderInfo, card);
 		else if (cargoReceiverInfo.IsValid()) Waila::UI::Card::FromCargoReceiver(cargoReceiverInfo, card);
 		else if (railInfo.IsValid())          Waila::UI::Card::FromRail(railInfo, card);
+
+		if (goRequested && m_goEnabled.load() && card.valid && bHit && hit.actor && TargetOn(aimed))
+			StartGoPlace(card, hit.actor, aimed);
 
 		// Size the window to exactly what the card will paint, at the current scale.
 		const bool hasCard = card.valid;

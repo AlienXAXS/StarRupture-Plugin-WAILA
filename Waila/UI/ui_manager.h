@@ -13,6 +13,7 @@
 #include "UI/card_model.h"
 #include "Engine_structs.hpp"
 #include <atomic>
+#include <cstdint>
 #include <mutex>
 #include <string>
 
@@ -27,6 +28,12 @@ namespace Waila::UI
 	class WailaUIManager
 	{
 	public:
+		// What a card was built for, which says the feature it is behind.
+		enum class Target : uint8_t
+		{
+			None, Crafter, Storage, Power, CoolerActive, CoolerPassive, Sender, Receiver, Rail
+		};
+
 		WailaUIManager() = default;
 		~WailaUIManager() = default;
 
@@ -46,6 +53,14 @@ namespace Waila::UI
 
 		void RegisterMainWidget();
 		void UnregisterMainWidget();
+
+		// ── Go To Target ─────────────────────────────────────────────────────
+		// Hands the aimed building to the Go to Item plugin as a place.
+		void RegisterGoKey();
+		void UnregisterGoKey();
+		void StartGoPlace(const Waila::UI::CardModel& card, SDK::AActor* actor, Target kind);
+		void CloseGoPlace();
+		static bool TargetOn(Target kind);
 		void UpdateWindowHints(float width, float height);
 
 		// Full read from the ini, for startup only.
@@ -55,6 +70,7 @@ namespace Waila::UI
 		// ── Static C-linkage callbacks for plugin API ────────────────────────
 		static void OnTick(float deltaSeconds);
 		static void OnRenderWidget(IModLoaderImGui* imgui);
+		static void OnGoKey(EModKey key, EModKeyEvent event);
 
 		static void OnConfigChanged(const char* section, const char* key, const char* newValue);
 
@@ -75,6 +91,14 @@ namespace Waila::UI
 		PluginWindowHints m_widgetHints      = {};
 
 		Waila::Core::WailaRaycastSystem m_raycaster;
+
+		// Go To Target. The key callback only raises m_goRequested; the next Tick
+		// (game thread) reads the aimed actor and calls Go to Item.
+		std::atomic<bool> m_goEnabled{ true };
+		std::atomic<bool> m_goRequested{ false };
+		char              m_goKeyName[64] = {};   // as registered; the loader unregisters by it
+		uint64_t          m_goPlaceKey    = 0;    // Tick only: the place handed to Go to Item, 0 = none
+		Target            m_goPlaceKind   = Target::None;   // Tick only: the card it started from
 
 		// Built by Tick (game thread), consumed by RenderWidget (render thread).
 		// The model holds no engine pointers, so the render side never touches a

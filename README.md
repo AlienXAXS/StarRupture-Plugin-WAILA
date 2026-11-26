@@ -14,6 +14,7 @@
   - **Cargo Senders** — send interval, send progress, current item being shipped
   - **Cargo Receivers** — incoming cargo state
   - **Drone Rails** — what the machines attached to a rail's network make and take, read from the game's drone logistics, so it works with nothing moving and along the whole line, out of render range too. See [Rail card](#rail-card) <sup>[✦](#msantoro12)</sup>
+- **Go To Target** key (default End): aim at a building and press it to have the Go to Item plugin mark it. The mark follows the building and closes when you get within 10 m, when you close it, or when the building is gone. It needs the Go to Item plugin; without it the key does nothing. The key and an on/off switch are on the ModLoader config page (F2) <sup>[✦](#msantoro12)</sup>
 - Configurable max detection distance, card scale/opacity, and optional building descriptions
 - Item and building icons come from the ModLoader's image library, which keeps one small copy of each image for every mod. A card keeps its layout while an icon is still loading. Icons are drawn sharper, and those on a drone rail card larger. Icons follow the overlay font size, and the card widens to fit them
 - Thread-safe: game tick and ImGui render thread are fully decoupled via mutex
@@ -105,6 +106,8 @@ Available options:
 | `WAILA` | `Render Building Descriptions` | `true` | Show/hide the building description line in the HUD panel |
 | `WAILA` | `Scale` | `1.0` | Size of the card, 0.5 to 3.0; raise it for 4K displays |
 | `WAILA` | `Opacity` | `0.92` | Opacity of the card background, 0.3 to 1.0 |
+| `WAILA` | `Go To Target` | `true` | Let the Go To Target key work; needs the Go to Item plugin |
+| `WAILA` | `Go To Target Key` | `End` | Key that has Go to Item mark the building you are looking at |
 
 ## Architecture
 
