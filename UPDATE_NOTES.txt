@@ -1,1 +1,2 @@
+- You can now install and update WAILA from the mod loader's Browse list.
 - A machine card shows the item a recipe makes with that item's own icon, so Sulfuric Acid is no longer drawn with the Battery's icon
