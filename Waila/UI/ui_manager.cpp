@@ -407,6 +407,7 @@ namespace Waila::UI
 					m_pendingCard.Clear();
 				}
 				Waila::RailDetector::Reset();
+				CloseGoPlace();
 				if (m_widgetVisible && m_self->hooks && m_self->hooks->UI && m_widgetHandle)
 				{
 					m_self->hooks->UI->SetWidgetVisible(m_widgetHandle, false);
