@@ -72,11 +72,14 @@ namespace Waila::Fields
             RecipeBuildTime, QueuedRecipe, QueuedOutput, OrderItem, OrderCount,
             FragMultiplier, FragMissingItems, FragOutputFull, FragSelected, FragSpeed,
             SocketsData, Spline, SocketRef, SocketTransform,
-            PackageTransportReplicator, SendingTime, SenderReceiversContainer, AllSenderReceiversData,
+            PackageTransportReplicator, SenderReceiversContainer, AllSenderReceiversData,
             ConnectionsContainer, ConnectionsData, ConnectionSender, ConnectionReceiver, ConnectionAmount, ConnectionItem,
             ConnectionStartSendTime,
             HelperNetID, HelperEntity, PlacementSockets, SocketUseCount,
             SenderIsSender, SenderLocation, SenderItemType, SenderEntity);
+
+        // The one offset of our own, tagged with the build it was measured on.
+        all = PluginMap::ResolveField(scanner, self, SendingTime, nullptr, 0, kSendingTimeBuiltCL) && all;
 
         // The send start time is read as a float or a double, by the size the loader
         // reports. Any other size is not read: the features that list it are off.
