@@ -79,8 +79,9 @@ namespace Waila::Fields
 
 	// Package transport. SendingTime has no member in the Game-SDK, so it is a
 	// native field: the loader's row for the running build, or the offset below
-	// on the one build it was measured on, and none elsewhere. That build is
-	// not the one the SDK headers declare, so Resolve passes it on its own.
+	// on the one build it was verified on (127004, which has the same row in the
+	// loader's map), and none elsewhere. That build is not the one the SDK
+	// headers declare, so Resolve passes it on its own.
 	inline constexpr uint32_t kSendingTimeBuiltCL = 127004;
 	inline auto PackageTransportReplicator = WAILA_FIELD(ACrGameStateBase, PackageTransportReplicator);
 	inline auto SendingTime = PluginField<float>{ { "ACrPackageTransportReplicator::SendingTime",

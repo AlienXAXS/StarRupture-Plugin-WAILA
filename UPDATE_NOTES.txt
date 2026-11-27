@@ -2,3 +2,4 @@
 - You can now install and update WAILA from the mod loader's Browse list.
 - A machine card shows the item a recipe makes with that item's own icon, so Sulfuric Acid is no longer drawn with the Battery's icon
 - New Go To Target key (End): aim at a building and press it to have the Go to Item plugin mark it. Needs the Go to Item plugin
+- On game build 130045, use ModLoader v1.27.0 or newer to keep the Cargo Sender card and the send rates on the rail card. With an older loader whose version object map does not cover your game build, they stay off.
