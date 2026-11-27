@@ -63,12 +63,13 @@
     </ClCompile>
   </ItemDefinitionGroup>
 
-  <!-- PLUGIN_GAME_BUILT_CL: the game build this plugin's own candidate rows are for.
-       CI or tools\sr-update.ps1 can pass /p:PluginGameBuiltCL=<CL> instead. See
-       PluginGameBuild.props in the Plugin SDK. -->
-  <PropertyGroup>
-    <PluginGameBuiltCL Condition="'$(PluginGameBuiltCL)' == ''">127004</PluginGameBuiltCL>
-  </PropertyGroup>
+  <!-- ============================================================
+       PLUGIN_GAME_BUILT_CL
+       The game build (CL) stored in PluginInfo::gameBuiltCL.
+       PluginGameBuild.props (Plugin SDK) reads it from build_cl.txt in
+       the Game-SDK headers. For headers without that file, pass
+       /p:PluginGameBuiltCL=<CL>.
+       ============================================================ -->
   <Import Project="$(PluginSDKInclude)\..\PluginGameBuild.props"
           Condition="Exists('$(PluginSDKInclude)\..\PluginGameBuild.props')" />
 
